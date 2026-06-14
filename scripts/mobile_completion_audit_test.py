@@ -321,6 +321,10 @@ class MobileCompletionAuditTest(unittest.TestCase):
             checks["tenant_portal_release_handoff"]["detail"],
         )
         self.assertIn(
+            "store submission evidence checklist",
+            checks["tenant_portal_release_handoff"]["detail"],
+        )
+        self.assertIn(
             './scripts/build_flavor.sh "${{ matrix.flavor }}" android release apk',
             workflow,
         )

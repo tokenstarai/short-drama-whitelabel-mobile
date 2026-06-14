@@ -4864,6 +4864,20 @@ def check_tenant_portal_release_handoff(root: Path) -> Check:
         "storeProductRegistration",
         "nativeCapabilityRegistration",
         "storeReviewDeclarations",
+        "storeSubmissionEvidenceChecklist",
+        "storeSubmissionAllowedStatuses",
+        "storeSubmissionBaseRequiredFlags",
+        "storeSubmissionChannelRequiredFlags",
+        "allowedStatuses",
+        "requiredFlags",
+        "publicEvidenceExamples",
+        "evidenceTemplatePath",
+        "evidenceGuidePath",
+        "importCommand",
+        "publicBoundary",
+        "testFlightBuildUploaded",
+        "playInternalTrackUploaded",
+        "directSignedPackageReady",
         "distributionChannelReadiness",
         "ios/Runner/Runner.entitlements",
         "approved_user_choice_or_play_billing",
@@ -4906,6 +4920,11 @@ def check_tenant_portal_release_handoff(root: Path) -> Check:
         "build/store-submission-evidence/store-submission-evidence.json",
         "build/store-submission-evidence/store-submission-evidence.template.json",
         "build/store-submission-evidence/store-submission-evidence.guide.md",
+        "storeSubmissionEvidenceChecklist",
+        "exports android direct submission evidence checklist for tenant distribution",
+        "TestFlight build number",
+        "Signed APK or AAB checksum",
+        "directSignedPackageReady",
     ]
     missing = [
         f"model:{marker}"
@@ -4960,7 +4979,7 @@ def check_tenant_portal_release_handoff(root: Path) -> Check:
     return Check(
         "tenant_portal_release_handoff",
         "passed",
-        "Tenant portal exports release handoff metadata for OAuth callbacks, store products, native capabilities, store review declarations, distribution channels, store assets, iOS CI handoff, store signing handoff, store submission evidence, release package references, and regional user-choice billing without client-side provider secrets.",
+        "Tenant portal exports release handoff metadata for OAuth callbacks, store products, native capabilities, store review declarations, distribution channels, store assets, iOS CI handoff, store signing handoff, store submission evidence, store submission evidence checklist, release package references, and regional user-choice billing without client-side provider secrets.",
         evidence,
     )
 
