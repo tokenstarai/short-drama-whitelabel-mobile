@@ -578,6 +578,7 @@ class Check:
     status: str
     detail: str
     evidence: list[str]
+    completion_blocking: bool = True
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -585,7 +586,43 @@ class Check:
             "status": self.status,
             "detail": self.detail,
             "evidence": self.evidence,
+            "completionBlocking": self.completion_blocking,
         }
+
+
+def remote_ios_ci_build_evidence_passed(checks: list[Check]) -> bool:
+    by_id = {check.id: check for check in checks}
+    ci_artifacts = by_id.get("ios_ci_artifact_evidence")
+    workflow = by_id.get("ci_workflow")
+    return (
+        ci_artifacts is not None
+        and ci_artifacts.status == "passed"
+        and workflow is not None
+        and workflow.status == "passed"
+        and "four-flavor unsigned iOS debug builds" in workflow.detail
+        and "four-flavor unsigned iOS release builds" in workflow.detail
+    )
+
+
+def apply_completion_boundaries(checks: list[Check]) -> list[Check]:
+    if not remote_ios_ci_build_evidence_passed(checks):
+        return checks
+    for check in checks:
+        if check.id in {"ios_build_matrix", "ios_build_environment"}:
+            check.completion_blocking = False
+    return checks
+
+
+def completion_summary(checks: list[Check]) -> dict[str, Any]:
+    blocking_checks = [check for check in checks if check.completion_blocking]
+    return {
+        "passed": sum(1 for check in blocking_checks if check.status == "passed"),
+        "missing": sum(1 for check in blocking_checks if check.status == "missing"),
+        "failed": sum(1 for check in blocking_checks if check.status == "failed"),
+        "blocked": sum(1 for check in blocking_checks if check.status == "blocked"),
+        "diagnostic": sum(1 for check in checks if not check.completion_blocking),
+        "allStatuses": {check.id: check.status for check in checks},
+    }
 
 
 def rel(root: Path, path: Path) -> str:
@@ -5077,12 +5114,8 @@ def build_report(root: Path, strict_ios: bool) -> dict[str, Any]:
         check_ci_workflow(root),
         check_ios_environment(strict_ios),
     ]
-    summary = {
-        "passed": sum(1 for check in checks if check.status == "passed"),
-        "missing": sum(1 for check in checks if check.status == "missing"),
-        "failed": sum(1 for check in checks if check.status == "failed"),
-        "blocked": sum(1 for check in checks if check.status == "blocked"),
-    }
+    checks = apply_completion_boundaries(checks)
+    summary = completion_summary(checks)
     return {
         "schemaVersion": 1,
         "generatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),

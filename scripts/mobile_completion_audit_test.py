@@ -1482,6 +1482,52 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertEqual("passed", check.status)
         self.assertIn("build/ios-ci-evidence/ios-ci-artifacts.json", check.evidence)
 
+    def test_remote_ios_ci_evidence_makes_local_ios_diagnostics_nonblocking(self) -> None:
+        checks = [
+            mobile_completion_audit.Check(
+                "ios_build_matrix",
+                "blocked",
+                "local Xcode unavailable",
+                ["build/ios-build-matrix/ios-build-matrix.json"],
+            ),
+            mobile_completion_audit.Check(
+                "ios_build_environment",
+                "blocked",
+                "local Xcode unavailable",
+                ["xcode-select -p: /Library/Developer/CommandLineTools"],
+            ),
+            mobile_completion_audit.Check(
+                "ios_ci_artifact_evidence",
+                "passed",
+                "Downloaded GitHub Actions unsigned iOS artifacts were imported for all four flavors.",
+                ["build/ios-ci-evidence/ios-ci-artifacts.json"],
+            ),
+            mobile_completion_audit.Check(
+                "ci_workflow",
+                "passed",
+                "CI covers four-flavor unsigned iOS debug builds and four-flavor unsigned iOS release builds.",
+                ["../.github/workflows/mobile-flutter.yml"],
+            ),
+            mobile_completion_audit.Check(
+                "store_submission_evidence",
+                "blocked",
+                "tenant store submission evidence is missing",
+                ["build/store-submission-evidence/store-submission-evidence.json"],
+            ),
+        ]
+
+        bounded_checks = mobile_completion_audit.apply_completion_boundaries(checks)
+        by_id = {check.id: check for check in bounded_checks}
+        summary = mobile_completion_audit.completion_summary(bounded_checks)
+
+        self.assertFalse(by_id["ios_build_matrix"].completion_blocking)
+        self.assertFalse(by_id["ios_build_environment"].completion_blocking)
+        self.assertTrue(by_id["store_submission_evidence"].completion_blocking)
+        self.assertEqual(0, summary["failed"])
+        self.assertEqual(1, summary["blocked"])
+        self.assertEqual("blocked", summary["allStatuses"]["ios_build_matrix"])
+        self.assertEqual("blocked", summary["allStatuses"]["ios_build_environment"])
+
     def test_store_submission_evidence_gate_validates_public_submission_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
