@@ -150,6 +150,14 @@ def packaged_bytes(entry_path: str, source_path: Path) -> bytes:
     return source_path.read_bytes()
 
 
+def packaged_mode(entry_path: str) -> int:
+    if entry_path == "android/gradlew":
+        return 0o755
+    if entry_path.startswith("scripts/") and entry_path.endswith((".sh", ".py", ".mjs")):
+        return 0o755
+    return 0o644
+
+
 def disallowed_value_hits(entries: list[tuple[str, Path]]) -> list[dict[str, str]]:
     hits: list[dict[str, str]] = []
     for entry_path, source_path in entries:
@@ -197,8 +205,9 @@ def write_package(entries: list[tuple[str, Path]], package_path: Path) -> None:
         for entry_path, source_path in entries:
             info = zipfile.ZipInfo(f"{PACKAGE_NAME}/{entry_path}")
             info.date_time = (2026, 1, 1, 0, 0, 0)
+            info.create_system = 3
             info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
+            info.external_attr = packaged_mode(entry_path) << 16
             archive.writestr(info, packaged_bytes(entry_path, source_path))
 
 

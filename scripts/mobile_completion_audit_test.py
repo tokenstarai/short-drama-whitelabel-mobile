@@ -610,6 +610,26 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn("working-directory: .", workflow)
         self.assertIn("build/open-source/short-drama-whitelabel-mobile.zip", workflow)
 
+    def test_open_source_package_keeps_ci_scripts_executable(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        package_path = root / "build" / "open-source" / "short-drama-whitelabel-mobile.zip"
+
+        with zipfile.ZipFile(package_path) as archive:
+            modes = {
+                script: (archive.getinfo(f"short-drama-whitelabel-mobile/{script}").external_attr >> 16) & 0o777
+                for script in [
+                    "scripts/check_mobile.sh",
+                    "scripts/build_flavor.sh",
+                    "scripts/check_native_config.sh",
+                    "scripts/write_store_handoff_manifest.py",
+                    "scripts/export_open_source_template.py",
+                    "scripts/import_ios_ci_artifacts.py",
+                ]
+            }
+
+        for script, mode in modes.items():
+            self.assertEqual(0o755, mode, script)
+
     def test_store_handoff_manifest_is_public_and_actionable(self) -> None:
         root = Path(__file__).resolve().parents[1]
 
