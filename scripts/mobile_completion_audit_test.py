@@ -97,6 +97,22 @@ class MobileCompletionAuditTest(unittest.TestCase):
 
         self.assertEqual("1001", run_id)
 
+    def test_download_ios_ci_artifacts_clears_stale_flavor_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "ci-ios"
+            destination = source_dir / "hongguo"
+            destination.mkdir(parents=True)
+            (destination / "AppFrameworkInfo.plist").write_text("stale", encoding="utf-8")
+
+            prepared = download_ios_ci_artifacts.prepare_download_destination(
+                source_dir,
+                "hongguo",
+            )
+
+            self.assertEqual(destination, prepared)
+            self.assertTrue(prepared.exists())
+            self.assertEqual([], list(prepared.iterdir()))
+
     def test_store_submission_evidence_importer_requires_public_tenant_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

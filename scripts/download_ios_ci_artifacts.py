@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -132,6 +133,14 @@ def download_command(repo: str, run_id: str, flavor: str, source_dir: Path) -> l
     ]
 
 
+def prepare_download_destination(source_dir: Path, flavor: str) -> Path:
+    destination = source_dir / flavor
+    if destination.exists():
+        shutil.rmtree(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    return destination
+
+
 def import_command(source_dir: Path, import_output: Path) -> list[str]:
     return [
         "python3",
@@ -223,6 +232,7 @@ def main() -> int:
 
     source_dir.mkdir(parents=True, exist_ok=True)
     for flavor in FLAVOR_ORDER:
+        prepare_download_destination(source_dir, flavor)
         run(download_command(repo, run_id, flavor, source_dir), cwd=ROOT)
     run(import_command(source_dir, import_output), cwd=ROOT)
     print(f"Imported iOS CI artifact evidence: {import_output.relative_to(ROOT)}")
