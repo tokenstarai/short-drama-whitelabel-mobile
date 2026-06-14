@@ -2995,6 +2995,10 @@ def check_github_publication_evidence(root: Path) -> Check:
             problems.append(f"asset:{asset_name}:sizeBytes")
         if not isinstance(asset.get("downloadUrl"), str) or asset_name not in asset.get("downloadUrl", ""):
             problems.append(f"asset:{asset_name}:downloadUrl")
+        if not isinstance(asset.get("remoteDigestSha256"), str) or not re.fullmatch(r"[a-f0-9]{64}", asset.get("remoteDigestSha256", "")):
+            problems.append(f"asset:{asset_name}:remoteDigestSha256")
+        if asset.get("digestMatchesLocal") is not True:
+            problems.append(f"asset:{asset_name}:digestMatchesLocal")
     for key in ["sourcePackageSha256", "sourceManifestSha256"]:
         value = report.get(key)
         if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):

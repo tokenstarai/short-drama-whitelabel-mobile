@@ -70,6 +70,17 @@ def asset_size(asset: dict[str, Any]) -> int:
     return 0
 
 
+def asset_digest_sha256(asset: dict[str, Any]) -> str | None:
+    for key in ["digest", "remoteDigest", "remoteDigestSha256", "sha256"]:
+        value = asset.get(key)
+        if not isinstance(value, str) or not value:
+            continue
+        digest = value.split(":", 1)[1] if value.startswith("sha256:") else value
+        if len(digest) == 64 and all(character in "0123456789abcdef" for character in digest.lower()):
+            return digest.lower()
+    return None
+
+
 def default_branch(repo_info: dict[str, Any]) -> tuple[str, str | None]:
     branch = repo_info.get("defaultBranchRef")
     if isinstance(branch, dict):
@@ -88,12 +99,26 @@ def build_report(
     branch_name, branch_oid = default_branch(repo_info)
     package_path = root / "build" / "open-source" / "short-drama-whitelabel-mobile.zip"
     manifest_path = root / "build" / "open-source" / "open-source-template-manifest.json"
+    expected_hashes = {
+        "short-drama-whitelabel-mobile.zip": sha256_file(package_path)
+        if package_path.exists()
+        else None,
+        "open-source-template-manifest.json": sha256_file(manifest_path)
+        if manifest_path.exists()
+        else None,
+    }
     assets = [
         {
             "name": str(asset.get("name") or ""),
             "contentType": str(asset.get("contentType") or ""),
             "sizeBytes": asset_size(asset),
             "downloadUrl": asset_download_url(asset),
+            "remoteDigestSha256": asset_digest_sha256(asset),
+            "expectedLocalSha256": expected_hashes.get(str(asset.get("name") or "")),
+            "digestMatchesLocal": (
+                asset_digest_sha256(asset) is not None
+                and expected_hashes.get(str(asset.get("name") or "")) == asset_digest_sha256(asset)
+            ),
         }
         for asset in release_info.get("assets", [])
         if isinstance(asset, dict)
@@ -118,8 +143,8 @@ def build_report(
         "assets": assets,
         "sourcePackagePath": rel(root, package_path),
         "sourceManifestPath": rel(root, manifest_path),
-        "sourcePackageSha256": sha256_file(package_path) if package_path.exists() else None,
-        "sourceManifestSha256": sha256_file(manifest_path) if manifest_path.exists() else None,
+        "sourcePackageSha256": expected_hashes["short-drama-whitelabel-mobile.zip"],
+        "sourceManifestSha256": expected_hashes["open-source-template-manifest.json"],
         "secretBoundary": "Public GitHub repository and release metadata only; no credentials or signing material.",
     }
     problems: list[str] = []
@@ -131,6 +156,10 @@ def build_report(
     for name in ["short-drama-whitelabel-mobile.zip", "open-source-template-manifest.json"]:
         if name not in asset_names:
             problems.append(f"asset:{name}")
+            continue
+        asset = next(asset for asset in assets if asset["name"] == name)
+        if asset.get("remoteDigestSha256") != expected_hashes.get(name):
+            problems.append(f"asset:{name}:remoteDigestSha256")
     marker_hits = export_github_publish_handoff.marker_hits(report)
     report["disallowedValueMarkerHits"] = marker_hits
     if problems or marker_hits:

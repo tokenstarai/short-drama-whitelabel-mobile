@@ -621,12 +621,16 @@ class MobileCompletionAuditTest(unittest.TestCase):
                             "contentType": "application/zip",
                             "sizeBytes": 123,
                             "downloadUrl": "https://github.com/tokenstarai/short-drama-whitelabel-mobile/releases/download/mobile-template-v0.1.0/short-drama-whitelabel-mobile.zip",
+                            "remoteDigestSha256": "a" * 64,
+                            "digestMatchesLocal": True,
                         },
                         {
                             "name": "open-source-template-manifest.json",
                             "contentType": "application/json",
                             "sizeBytes": 456,
                             "downloadUrl": "https://github.com/tokenstarai/short-drama-whitelabel-mobile/releases/download/mobile-template-v0.1.0/open-source-template-manifest.json",
+                            "remoteDigestSha256": "b" * 64,
+                            "digestMatchesLocal": True,
                         },
                     ],
                     "sourcePackageSha256": "a" * 64,
@@ -650,6 +654,8 @@ class MobileCompletionAuditTest(unittest.TestCase):
             package.parent.mkdir(parents=True)
             package.write_bytes(b"zip")
             manifest.write_text("{}", encoding="utf-8")
+            package_sha = hashlib.sha256(package.read_bytes()).hexdigest()
+            manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
 
             report = import_github_publication_evidence.build_report(
                 root=root,
@@ -669,12 +675,14 @@ class MobileCompletionAuditTest(unittest.TestCase):
                             "name": "short-drama-whitelabel-mobile.zip",
                             "contentType": "application/zip",
                             "size": 123,
+                            "digest": "sha256:" + package_sha,
                             "url": "https://github.com/download/short-drama-whitelabel-mobile.zip",
                         },
                         {
                             "name": "open-source-template-manifest.json",
                             "contentType": "application/json",
                             "size": 456,
+                            "digest": "sha256:" + manifest_sha,
                             "url": "https://github.com/download/open-source-template-manifest.json",
                         },
                     ],
@@ -686,9 +694,58 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertEqual("abc123", report["repository"]["pushedCommit"])
         self.assertEqual("mobile-template-v0.1.0", report["release"]["tagName"])
         self.assertEqual(["open-source-template-manifest.json", "short-drama-whitelabel-mobile.zip"], sorted(asset["name"] for asset in report["assets"]))
+        self.assertTrue(all(asset["digestMatchesLocal"] for asset in report["assets"]))
         self.assertRegex(report["sourcePackageSha256"], r"^[a-f0-9]{64}$")
         self.assertRegex(report["sourceManifestSha256"], r"^[a-f0-9]{64}$")
         self.assertEqual([], report["disallowedValueMarkerHits"])
+
+    def test_github_publication_evidence_importer_blocks_mismatched_release_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            package = root / "build" / "open-source" / "short-drama-whitelabel-mobile.zip"
+            manifest = root / "build" / "open-source" / "open-source-template-manifest.json"
+            package.parent.mkdir(parents=True)
+            package.write_bytes(b"zip")
+            manifest.write_text("{}", encoding="utf-8")
+            manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+            report = import_github_publication_evidence.build_report(
+                root=root,
+                repo_info={
+                    "nameWithOwner": "tokenstarai/short-drama-whitelabel-mobile",
+                    "url": "https://github.com/tokenstarai/short-drama-whitelabel-mobile",
+                    "visibility": "PUBLIC",
+                    "defaultBranchRef": {"name": "main", "target": {"oid": "abc123"}},
+                },
+                release_info={
+                    "tagName": "mobile-template-v0.1.0",
+                    "url": "https://github.com/tokenstarai/short-drama-whitelabel-mobile/releases/tag/mobile-template-v0.1.0",
+                    "isDraft": False,
+                    "isPrerelease": False,
+                    "assets": [
+                        {
+                            "name": "short-drama-whitelabel-mobile.zip",
+                            "contentType": "application/zip",
+                            "size": 123,
+                            "digest": "sha256:" + ("0" * 64),
+                            "url": "https://github.com/download/short-drama-whitelabel-mobile.zip",
+                        },
+                        {
+                            "name": "open-source-template-manifest.json",
+                            "contentType": "application/json",
+                            "size": 456,
+                            "digest": "sha256:" + manifest_sha,
+                            "url": "https://github.com/download/open-source-template-manifest.json",
+                        },
+                    ],
+                },
+            )
+
+        self.assertEqual("blocked", report["result"])
+        self.assertIn(
+            "asset:short-drama-whitelabel-mobile.zip:remoteDigestSha256",
+            report["blockers"],
+        )
 
     def test_open_source_package_uses_standalone_github_actions_paths(self) -> None:
         root = Path(__file__).resolve().parents[1]
