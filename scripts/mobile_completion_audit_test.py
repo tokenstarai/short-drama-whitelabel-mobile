@@ -636,6 +636,14 @@ class MobileCompletionAuditTest(unittest.TestCase):
 
         self.assertEqual(workflow, resolved)
 
+    def test_ios_build_script_uses_xcconfig_selection_without_flutter_flavor_flag(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts" / "build_flavor.sh").read_text(encoding="utf-8")
+
+        self.assertIn('cp "$source_config" "$ios_config"', script)
+        self.assertIn('"$flutter_bin" build ios "--$mode" --no-codesign --dart-define="APP_FLAVOR=$flavor"', script)
+        self.assertNotIn('"$flutter_bin" build ios "--$mode" --flavor "$flavor"', script)
+
     def test_open_source_package_keeps_ci_scripts_executable(self) -> None:
         root = Path(__file__).resolve().parents[1]
         package_path = root / "build" / "open-source" / "short-drama-whitelabel-mobile.zip"

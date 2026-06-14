@@ -129,7 +129,7 @@ case "$platform" in
     }
     trap restore EXIT
     cp "$source_config" "$ios_config"
-    (cd "$mobile_dir" && "$flutter_bin" build ios "--$mode" --flavor "$flavor" --no-codesign --dart-define="APP_FLAVOR=$flavor")
+    (cd "$mobile_dir" && "$flutter_bin" build ios "--$mode" --no-codesign --dart-define="APP_FLAVOR=$flavor")
     ;;
   *)
     echo "Unknown platform: $platform" >&2
