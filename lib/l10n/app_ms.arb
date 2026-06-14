@@ -1,0 +1,23 @@
+{
+  "@@locale": "ms",
+  "appTitle": "Drama Pendek",
+  "tabHome": "Laman Utama",
+  "tabCatalog": "Katalog",
+  "tabTheater": "Teater",
+  "tabMine": "Saya",
+  "startWatching": "Mula Menonton",
+  "unlockAndPlay": "Buka dan Main",
+  "serviceMaintenance": "Perkhidmatan sedang diselenggara. Sila cuba lagi kemudian.",
+  "insufficientBalance": "Kandungan ini belum boleh dimainkan. Sila cuba lagi kemudian.",
+  "notAuthorized": "Kandungan ini belum dibuka.",
+  "episodeNotReady": "Episod ini sedang disediakan.",
+  "playbackTokenFailed": "Kebenaran main balik gagal. Sila cuba lagi.",
+  "cardRedeem": "Tebus Kad",
+  "onlinePayment": "Tambah Nilai Dalam Talian",
+  "accountDelete": "Padam Akaun",
+  "settings": "Tetapan",
+  "language": "Bahasa",
+  "pointCardManagement": "Pengurusan Kad Mata",
+  "noPointCardRecords": "Tiada rekod kad mata lagi",
+  "consumerWallet": "dompet pengguna"
+}

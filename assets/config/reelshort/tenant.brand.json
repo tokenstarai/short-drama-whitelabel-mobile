@@ -1,0 +1,12 @@
+{
+  "appName": "Cliff Drama",
+  "bundleId": "com.shortdrama.cliff",
+  "tenantCode": "cliffdrama",
+  "primaryColor": "#FFB23F",
+  "logoAsset": "",
+  "supportedLocales": ["en-US", "id-ID", "fil-PH"],
+  "customerServiceUrl": "https://tenant-edge.example.workers.dev/support",
+  "termsUrl": "https://tenant-edge.example.workers.dev/terms",
+  "privacyUrl": "https://tenant-edge.example.workers.dev/privacy",
+  "apiAdapterBase": "https://cliff-tenant-edge.example.workers.dev"
+}

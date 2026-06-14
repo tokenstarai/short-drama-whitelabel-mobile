@@ -1,0 +1,23 @@
+{
+  "@@locale": "zh",
+  "appTitle": "短剧",
+  "tabHome": "首页",
+  "tabCatalog": "分类",
+  "tabTheater": "剧场",
+  "tabMine": "我的",
+  "startWatching": "开始观看",
+  "unlockAndPlay": "解锁并播放",
+  "serviceMaintenance": "服务维护中，请稍后再试。",
+  "insufficientBalance": "当前内容暂时不可播放，请稍后再试。",
+  "notAuthorized": "内容暂未开放。",
+  "episodeNotReady": "本集正在准备中。",
+  "playbackTokenFailed": "播放授权失败，请重试。",
+  "cardRedeem": "点卡兑换",
+  "onlinePayment": "在线充值",
+  "accountDelete": "删除账号",
+  "settings": "设置",
+  "language": "语言",
+  "pointCardManagement": "点卡管理",
+  "noPointCardRecords": "暂无点卡记录",
+  "consumerWallet": "C端钱包"
+}

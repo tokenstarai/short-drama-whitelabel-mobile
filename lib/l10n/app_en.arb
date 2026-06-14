@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "appTitle": "Short Drama",
+  "tabHome": "Home",
+  "tabCatalog": "Catalog",
+  "tabTheater": "Theater",
+  "tabMine": "Mine",
+  "startWatching": "Start Watching",
+  "unlockAndPlay": "Unlock and Play",
+  "serviceMaintenance": "Service is under maintenance. Please try again later.",
+  "insufficientBalance": "This content is temporarily unavailable. Please try again later.",
+  "notAuthorized": "This content is not available yet.",
+  "episodeNotReady": "This episode is being prepared.",
+  "playbackTokenFailed": "Playback authorization failed. Please retry.",
+  "cardRedeem": "Redeem Card",
+  "onlinePayment": "Online Top Up",
+  "accountDelete": "Delete Account",
+  "settings": "Settings",
+  "language": "Language",
+  "pointCardManagement": "Point Card Management",
+  "noPointCardRecords": "No point card records yet",
+  "consumerWallet": "consumer wallet"
+}

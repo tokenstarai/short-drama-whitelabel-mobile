@@ -1,0 +1,12 @@
+{
+  "appName": "GoldFruit Drama",
+  "bundleId": "com.shortdrama.goldfruit",
+  "tenantCode": "goldfruit",
+  "primaryColor": "#4F46E5",
+  "logoAsset": "",
+  "supportedLocales": ["en-US", "zh-CN", "th-TH", "id-ID", "vi-VN", "ms-MY", "fil-PH"],
+  "customerServiceUrl": "https://short-drama-saas-admin-staging.pages.dev/support",
+  "termsUrl": "https://short-drama-saas-admin-staging.pages.dev/terms",
+  "privacyUrl": "https://short-drama-saas-admin-staging.pages.dev/privacy",
+  "apiAdapterBase": "https://short-drama-saas-tenant-edge-staging.tokenstarai.workers.dev"
+}

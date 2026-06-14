@@ -1,0 +1,12 @@
+{
+  "appName": "Blue Drama",
+  "bundleId": "com.shortdrama.blue",
+  "tenantCode": "bluedrama",
+  "primaryColor": "#2563EB",
+  "logoAsset": "",
+  "supportedLocales": ["vi-VN", "en-US", "zh-CN"],
+  "customerServiceUrl": "https://example.com/blue/support",
+  "termsUrl": "https://example.com/blue/terms",
+  "privacyUrl": "https://example.com/blue/privacy",
+  "apiAdapterBase": "https://blue-tenant-edge.example.workers.dev"
+}

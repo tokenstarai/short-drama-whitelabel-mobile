@@ -1,0 +1,7 @@
+{
+  "styleTemplate": "hongguo_inspired",
+  "storeComplianceMode": "app_store",
+  "authProviders": ["email", "google", "apple"],
+  "consumerPaymentProviders": ["iap"],
+  "consumerLedgerScope": "consumer"
+}

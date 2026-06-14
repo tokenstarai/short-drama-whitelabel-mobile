@@ -1,0 +1,12 @@
+{
+  "appName": "Purple Drama",
+  "bundleId": "com.shortdrama.purple",
+  "tenantCode": "purpledrama",
+  "primaryColor": "#7C3AED",
+  "logoAsset": "",
+  "supportedLocales": ["th-TH", "en-US", "zh-CN"],
+  "customerServiceUrl": "https://example.com/purple/support",
+  "termsUrl": "https://example.com/purple/terms",
+  "privacyUrl": "https://example.com/purple/privacy",
+  "apiAdapterBase": "https://purple-tenant-edge.example.workers.dev"
+}

@@ -1,0 +1,23 @@
+{
+  "@@locale": "id",
+  "appTitle": "Drama Pendek",
+  "tabHome": "Beranda",
+  "tabCatalog": "Kategori",
+  "tabTheater": "Teater",
+  "tabMine": "Saya",
+  "startWatching": "Mulai Menonton",
+  "unlockAndPlay": "Buka dan Putar",
+  "serviceMaintenance": "Layanan sedang dalam pemeliharaan. Coba lagi nanti.",
+  "insufficientBalance": "Konten ini sementara belum dapat diputar. Coba lagi nanti.",
+  "notAuthorized": "Konten ini belum tersedia.",
+  "episodeNotReady": "Episode ini sedang disiapkan.",
+  "playbackTokenFailed": "Otorisasi pemutaran gagal. Coba lagi.",
+  "cardRedeem": "Tukar Kartu",
+  "onlinePayment": "Isi Saldo Online",
+  "accountDelete": "Hapus Akun",
+  "settings": "Pengaturan",
+  "language": "Bahasa",
+  "pointCardManagement": "Manajemen Kartu Poin",
+  "noPointCardRecords": "Belum ada catatan kartu poin",
+  "consumerWallet": "dompet konsumen"
+}

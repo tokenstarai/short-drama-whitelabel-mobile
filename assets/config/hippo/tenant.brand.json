@@ -1,0 +1,12 @@
+{
+  "appName": "River Drama",
+  "bundleId": "com.shortdrama.river",
+  "tenantCode": "riverdrama",
+  "primaryColor": "#0EA5A4",
+  "logoAsset": "",
+  "supportedLocales": ["zh-CN", "en-US", "ms-MY"],
+  "customerServiceUrl": "https://tenant-edge.example.workers.dev/support",
+  "termsUrl": "https://tenant-edge.example.workers.dev/terms",
+  "privacyUrl": "https://tenant-edge.example.workers.dev/privacy",
+  "apiAdapterBase": "https://river-tenant-edge.example.workers.dev"
+}

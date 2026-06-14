@@ -1,0 +1,12 @@
+{
+  "appName": "Pulse Drama",
+  "bundleId": "com.shortdrama.pulse",
+  "tenantCode": "pulsedrama",
+  "primaryColor": "#00D4FF",
+  "logoAsset": "",
+  "supportedLocales": ["zh-CN", "en-US", "th-TH"],
+  "customerServiceUrl": "https://tenant-edge.example.workers.dev/support",
+  "termsUrl": "https://tenant-edge.example.workers.dev/terms",
+  "privacyUrl": "https://tenant-edge.example.workers.dev/privacy",
+  "apiAdapterBase": "https://pulse-tenant-edge.example.workers.dev"
+}

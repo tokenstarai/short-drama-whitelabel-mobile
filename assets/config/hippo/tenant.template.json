@@ -1,0 +1,7 @@
+{
+  "styleTemplate": "hippo_inspired",
+  "storeComplianceMode": "app_store",
+  "authProviders": ["email", "apple"],
+  "consumerPaymentProviders": ["iap"],
+  "consumerLedgerScope": "consumer"
+}

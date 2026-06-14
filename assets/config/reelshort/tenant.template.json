@@ -1,0 +1,7 @@
+{
+  "styleTemplate": "reelshort_inspired",
+  "storeComplianceMode": "play_store",
+  "authProviders": ["email", "google"],
+  "consumerPaymentProviders": ["play_billing"],
+  "consumerLedgerScope": "consumer"
+}

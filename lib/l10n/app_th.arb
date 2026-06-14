@@ -1,0 +1,23 @@
+{
+  "@@locale": "th",
+  "appTitle": "ละครสั้น",
+  "tabHome": "หน้าแรก",
+  "tabCatalog": "หมวดหมู่",
+  "tabTheater": "โรงละคร",
+  "tabMine": "ของฉัน",
+  "startWatching": "เริ่มดู",
+  "unlockAndPlay": "ปลดล็อกและเล่น",
+  "serviceMaintenance": "ระบบกำลังปรับปรุง โปรดลองอีกครั้งภายหลัง",
+  "insufficientBalance": "เนื้อหานี้ยังไม่พร้อมให้เล่น โปรดลองอีกครั้งภายหลัง",
+  "notAuthorized": "เนื้อหานี้ยังไม่เปิดให้บริการ",
+  "episodeNotReady": "ตอนนี้กำลังเตรียมอยู่",
+  "playbackTokenFailed": "ขอสิทธิ์เล่นไม่สำเร็จ โปรดลองอีกครั้ง",
+  "cardRedeem": "แลกบัตร",
+  "onlinePayment": "เติมเงินออนไลน์",
+  "accountDelete": "ลบบัญชี",
+  "settings": "ตั้งค่า",
+  "language": "ภาษา",
+  "pointCardManagement": "จัดการบัตรแต้ม",
+  "noPointCardRecords": "ยังไม่มีประวัติบัตรแต้ม",
+  "consumerWallet": "กระเป๋าผู้ใช้"
+}

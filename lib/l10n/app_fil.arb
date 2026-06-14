@@ -1,0 +1,23 @@
+{
+  "@@locale": "fil",
+  "appTitle": "Maikling Drama",
+  "tabHome": "Home",
+  "tabCatalog": "Katalogo",
+  "tabTheater": "Teatro",
+  "tabMine": "Akin",
+  "startWatching": "Simulan Manood",
+  "unlockAndPlay": "I-unlock at I-play",
+  "serviceMaintenance": "May maintenance ang serbisyo. Subukan muli mamaya.",
+  "insufficientBalance": "Hindi pansamantalang mapanood ang content na ito. Subukan muli mamaya.",
+  "notAuthorized": "Hindi pa bukas ang content na ito.",
+  "episodeNotReady": "Inihahanda pa ang episode na ito.",
+  "playbackTokenFailed": "Nabigo ang playback authorization. Subukan muli.",
+  "cardRedeem": "I-redeem ang Card",
+  "onlinePayment": "Online Top Up",
+  "accountDelete": "Burahin ang Account",
+  "settings": "Mga Setting",
+  "language": "Wika",
+  "pointCardManagement": "Pamamahala ng Point Card",
+  "noPointCardRecords": "Wala pang point card records",
+  "consumerWallet": "consumer wallet"
+}

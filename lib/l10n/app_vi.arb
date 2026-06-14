@@ -1,0 +1,23 @@
+{
+  "@@locale": "vi",
+  "appTitle": "Phim ngắn",
+  "tabHome": "Trang chủ",
+  "tabCatalog": "Danh mục",
+  "tabTheater": "Rạp",
+  "tabMine": "Của tôi",
+  "startWatching": "Bắt đầu xem",
+  "unlockAndPlay": "Mở khóa và phát",
+  "serviceMaintenance": "Dịch vụ đang bảo trì. Vui lòng thử lại sau.",
+  "insufficientBalance": "Nội dung hiện chưa thể phát. Vui lòng thử lại sau.",
+  "notAuthorized": "Nội dung chưa được mở.",
+  "episodeNotReady": "Tập này đang được chuẩn bị.",
+  "playbackTokenFailed": "Ủy quyền phát không thành công. Vui lòng thử lại.",
+  "cardRedeem": "Đổi thẻ",
+  "onlinePayment": "Nạp tiền trực tuyến",
+  "accountDelete": "Xóa tài khoản",
+  "settings": "Cài đặt",
+  "language": "Ngôn ngữ",
+  "pointCardManagement": "Quản lý thẻ điểm",
+  "noPointCardRecords": "Chưa có lịch sử thẻ điểm",
+  "consumerWallet": "ví người dùng"
+}
