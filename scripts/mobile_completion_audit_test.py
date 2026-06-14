@@ -333,6 +333,10 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn("publicEvidenceExamples", tenant_portal_main)
         self.assertIn("importCommand", tenant_portal_main)
         self.assertIn("publicBoundary", tenant_portal_main)
+        self.assertIn("模板选择矩阵", tenant_portal_main)
+        self.assertIn("templateOptions", tenant_portal_main)
+        self.assertIn("setPreviewTemplate", tenant_portal_main)
+        self.assertIn("defaultStoreComplianceMode", tenant_portal_main)
         self.assertIn(
             './scripts/build_flavor.sh "${{ matrix.flavor }}" android release apk',
             workflow,

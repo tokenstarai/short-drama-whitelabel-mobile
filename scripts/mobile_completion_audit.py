@@ -4954,6 +4954,10 @@ def check_tenant_portal_release_handoff(root: Path) -> Check:
     if "storeSubmissionEvidenceGuide" not in main_text:
         missing.append("main:storeSubmissionEvidenceGuide")
     required_main_markers = [
+        "模板选择矩阵",
+        "templateOptions",
+        "setPreviewTemplate",
+        "defaultStoreComplianceMode",
         "商店提交证据清单",
         "allowedStatuses",
         "requiredFlags",
