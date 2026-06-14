@@ -18,6 +18,7 @@ import download_ios_ci_artifacts
 import export_completion_unblocker
 import export_github_publish_handoff
 import export_ios_ci_handoff
+import export_store_submission_starter
 import import_github_publication_evidence
 import import_ios_ci_artifacts
 import import_store_submission_evidence
@@ -199,6 +200,63 @@ class MobileCompletionAuditTest(unittest.TestCase):
         for marker in import_store_submission_evidence.FORBIDDEN_MARKERS:
             self.assertNotIn(marker, lowered)
 
+    def test_store_submission_starter_package_exports_tenant_fillable_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "store-submission-starter"
+
+            manifest = export_store_submission_starter.export_starter(
+                root=Path(__file__).resolve().parents[1],
+                output_dir=output_dir,
+            )
+
+            starter_zip = output_dir / "mobile-store-submission-starter.zip"
+            with zipfile.ZipFile(starter_zip) as archive:
+                names = set(archive.namelist())
+                self.assertIn(
+                    "mobile-store-submission-starter/douyin/store-submission-evidence.input.example.json",
+                    names,
+                )
+                self.assertIn(
+                    "mobile-store-submission-starter/reelshort/operator-checklist.md",
+                    names,
+                )
+                input_example = json.loads(
+                    archive.read(
+                        "mobile-store-submission-starter/douyin/store-submission-evidence.input.example.json",
+                    ).decode("utf-8"),
+                )
+
+        self.assertEqual("mobile_store_submission_starter", manifest["packageType"])
+        self.assertEqual([], manifest["disallowedValueMarkerHits"])
+        self.assertRegex(manifest["packageSha256"], r"^[a-f0-9]{64}$")
+        self.assertEqual(
+            "Copy each flavor input example to build/store-submission-evidence/store-submission-evidence.input.json after tenant-owned signing and store setup.",
+            manifest["tenantActionSummary"],
+        )
+        flavors = {entry["flavor"]: entry for entry in manifest["flavors"]}
+        self.assertEqual(set(import_store_submission_evidence.FLAVOR_DEFAULTS), set(flavors))
+
+        douyin = flavors["douyin"]
+        self.assertEqual("android_direct", douyin["primaryChannel"])
+        self.assertIn("direct_signed_package_ready", douyin["allowedStatuses"])
+        self.assertIn("directSignedPackageReady", douyin["requiredFlags"])
+        self.assertEqual("douyin/store-submission-evidence.input.example.json", douyin["inputExamplePath"])
+        self.assertEqual("douyin/operator-checklist.md", douyin["operatorChecklistPath"])
+
+        self.assertEqual("tenant_store_submission_public_evidence_input", input_example["source"])
+        self.assertEqual("douyin", input_example["submissions"][0]["flavor"])
+        self.assertEqual("pending_tenant_action", input_example["submissions"][0]["submissionStatus"])
+        self.assertFalse(input_example["submissions"][0]["directSignedPackageReady"])
+        self.assertFalse(input_example["submissions"][0]["directDistributionPolicyPublished"])
+        self.assertTrue(input_example["submissions"][0]["tenantMustReplacePlaceholders"])
+        self.assertEqual(
+            "Public status references only; do not paste signing files, provider credentials, API tokens, webhook secrets, service-account JSON, bank credentials, or private keys.",
+            input_example["secretBoundary"],
+        )
+        lowered = json.dumps(input_example, ensure_ascii=False).lower()
+        for marker in import_store_submission_evidence.FORBIDDEN_MARKERS:
+            self.assertNotIn(marker, lowered)
+
     def test_completion_report_includes_ci_and_release_secret_gates(self) -> None:
         root = Path(__file__).resolve().parents[1]
 
@@ -220,6 +278,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn("ios_ci_handoff_package", checks)
         self.assertIn("store_signing_handoff_package", checks)
         self.assertIn("store_publish_config_package", checks)
+        self.assertIn("store_submission_starter_package", checks)
         self.assertIn("ios_build_matrix", checks)
         self.assertIn("ios_ci_artifact_evidence", checks)
         self.assertIn("store_submission_evidence", checks)
@@ -239,6 +298,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertEqual("passed", checks["ios_ci_handoff_package"]["status"])
         self.assertEqual("passed", checks["store_signing_handoff_package"]["status"])
         self.assertEqual("passed", checks["store_publish_config_package"]["status"])
+        self.assertEqual("passed", checks["store_submission_starter_package"]["status"])
         self.assertIn(checks["ios_build_matrix"]["status"], {"passed", "blocked"})
         self.assertIn(checks["ios_ci_artifact_evidence"]["status"], {"passed", "blocked"})
         self.assertIn(checks["store_submission_evidence"]["status"], {"passed", "blocked"})
@@ -1199,6 +1259,22 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertRegex(store_submission_evidence["evidenceSha256"], r"^[a-f0-9]{64}$")
         self.assertRegex(store_submission_evidence["templateSha256"], r"^[a-f0-9]{64}$")
         self.assertRegex(store_submission_evidence["guideSha256"], r"^[a-f0-9]{64}$")
+        store_submission_starter = package["manifests"]["storeSubmissionStarter"]
+        self.assertEqual(
+            "build/store-submission-starter/store-submission-starter-manifest.json",
+            store_submission_starter["manifestPath"],
+        )
+        self.assertEqual(
+            "build/store-submission-starter/mobile-store-submission-starter.zip",
+            store_submission_starter["packagePath"],
+        )
+        self.assertEqual(4, store_submission_starter["flavorCount"])
+        self.assertRegex(store_submission_starter["manifestSha256"], r"^[a-f0-9]{64}$")
+        self.assertRegex(store_submission_starter["packageSha256"], r"^[a-f0-9]{64}$")
+        self.assertIn(
+            "Use the store-submission starter package to copy no-secret tenant-fillable evidence inputs before importing public store evidence.",
+            package["tenantWorkflow"],
+        )
         self.assertIn("docs/open-source-release.md", package["openSourceBoundary"]["docs"])
         self.assertFalse(package["secretBoundary"]["clientStoresTenantSecrets"])
         self.assertFalse(package["secretBoundary"]["clientStoresPaymentSecrets"])

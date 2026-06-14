@@ -25,6 +25,7 @@ from typing import Any
 import scan_release_artifacts
 import export_completion_unblocker
 import export_github_publish_handoff
+import export_store_submission_starter
 import import_store_submission_evidence
 
 
@@ -693,6 +694,7 @@ def check_required_files(root: Path) -> Check:
         "scripts/download_ios_ci_artifacts.py",
         "scripts/export_completion_unblocker.py",
         "scripts/export_github_publish_handoff.py",
+        "scripts/export_store_submission_starter.py",
         "scripts/import_github_publication_evidence.py",
         "scripts/import_store_submission_evidence.py",
         "scripts/mobile_completion_closure.py",
@@ -4286,6 +4288,101 @@ def check_store_publish_config_package(root: Path) -> Check:
     )
 
 
+def check_store_submission_starter_package(root: Path) -> Check:
+    output_dir = root / "build" / "store-submission-starter"
+    manifest_path = output_dir / "store-submission-starter-manifest.json"
+    package_path = output_dir / "mobile-store-submission-starter.zip"
+    evidence = [
+        "scripts/export_store_submission_starter.py",
+        rel(root, manifest_path),
+        rel(root, package_path),
+    ]
+    try:
+        manifest = export_store_submission_starter.export_starter(root, output_dir)
+    except Exception as error:  # pragma: no cover - defensive audit path
+        return Check(
+            "store_submission_starter_package",
+            "failed",
+            f"Store submission starter export failed: {error}",
+            evidence,
+        )
+
+    problems: list[str] = []
+    if manifest.get("packageType") != "mobile_store_submission_starter":
+        problems.append("packageType")
+    if manifest.get("disallowedValueMarkerHits"):
+        problems.append("disallowedValueMarkerHits")
+    if not package_path.exists() or manifest.get("packageSha256") != file_sha256(package_path):
+        problems.append("packageSha256")
+    zip_names: set[str] = set()
+    if package_path.exists():
+        try:
+            with zipfile.ZipFile(package_path) as archive:
+                zip_names = set(archive.namelist())
+        except zipfile.BadZipFile as error:
+            problems.append(f"bad-zip:{error}")
+
+    flavors = {
+        str(entry.get("flavor")): entry
+        for entry in manifest.get("flavors", [])
+        if isinstance(entry, dict)
+    }
+    if set(flavors) != set(FLAVORS):
+        problems.append("flavor-set")
+    for flavor, entry in flavors.items():
+        channel = str(entry.get("primaryChannel"))
+        input_path = output_dir / str(entry.get("inputExamplePath", ""))
+        checklist_path = output_dir / str(entry.get("operatorChecklistPath", ""))
+        evidence.extend([rel(root, input_path), rel(root, checklist_path)])
+        if set(entry.get("allowedStatuses", [])) != STORE_SUBMISSION_ALLOWED_STATUSES_BY_CHANNEL.get(channel):
+            problems.append(f"{flavor}:allowedStatuses")
+        if entry.get("requiredFlags") != store_submission_required_flags(channel):
+            problems.append(f"{flavor}:requiredFlags")
+        if f"mobile-store-submission-starter/{entry.get('inputExamplePath')}" not in zip_names:
+            problems.append(f"{flavor}:zipInputExample")
+        if f"mobile-store-submission-starter/{entry.get('operatorChecklistPath')}" not in zip_names:
+            problems.append(f"{flavor}:zipOperatorChecklist")
+        if not input_path.exists() or entry.get("inputExampleSha256") != file_sha256(input_path):
+            problems.append(f"{flavor}:inputExampleSha256")
+            continue
+        if not checklist_path.exists() or entry.get("operatorChecklistSha256") != file_sha256(checklist_path):
+            problems.append(f"{flavor}:operatorChecklistSha256")
+        try:
+            input_doc = json.loads(read_text(input_path))
+        except json.JSONDecodeError as error:
+            problems.append(f"{flavor}:inputJson:{error}")
+            continue
+        submissions = input_doc.get("submissions")
+        submission = submissions[0] if isinstance(submissions, list) and submissions else None
+        if not isinstance(submission, dict):
+            problems.append(f"{flavor}:submission")
+            continue
+        if submission.get("submissionStatus") != "pending_tenant_action":
+            problems.append(f"{flavor}:placeholderStatus")
+        if submission.get("tenantMustReplacePlaceholders") is not True:
+            problems.append(f"{flavor}:tenantMustReplacePlaceholders")
+        for flag in store_submission_required_flags(channel):
+            if submission.get(flag) is not False:
+                problems.append(f"{flavor}:placeholderFlag:{flag}")
+                break
+        if export_store_submission_starter.marker_hits(input_doc):
+            problems.append(f"{flavor}:forbiddenMarkers")
+
+    if problems:
+        return Check(
+            "store_submission_starter_package",
+            "failed",
+            f"Store submission starter package problems: {', '.join(problems)}",
+            sorted(set(evidence)),
+        )
+    return Check(
+        "store_submission_starter_package",
+        "passed",
+        "Store submission starter package exports no-secret tenant-fillable input examples and operator checklists for all four flavors without creating passing fake store evidence.",
+        sorted(set(evidence)),
+    )
+
+
 def write_tenant_release_package(root: Path) -> Path:
     output = root / "build" / "release-handoff" / "mobile-tenant-release-package.json"
     store_handoff_path = write_store_handoff_manifest(root)
@@ -4338,6 +4435,20 @@ def write_tenant_release_package(root: Path) -> Path:
         root / str(store_publish_manifest.get("packagePath", ""))
         if isinstance(store_publish_manifest, dict)
         else root / "build" / "store-publish-config" / "mobile-store-publish-config.zip"
+    )
+    store_submission_starter_dir = root / "build" / "store-submission-starter"
+    store_submission_starter_manifest = export_store_submission_starter.export_starter(
+        root,
+        store_submission_starter_dir,
+    )
+    store_submission_starter_manifest_path = (
+        store_submission_starter_dir / "store-submission-starter-manifest.json"
+    )
+    store_submission_starter_package_path = root / str(
+        store_submission_starter_manifest.get(
+            "packagePath",
+            "build/store-submission-starter/mobile-store-submission-starter.zip",
+        ),
     )
     store_submission_evidence_path = root / "build" / "store-submission-evidence" / "store-submission-evidence.json"
     store_submission_template_path = root / "build" / "store-submission-evidence" / "store-submission-evidence.template.json"
@@ -4527,6 +4638,25 @@ def write_tenant_release_package(root: Path) -> Path:
                 and isinstance(store_submission_evidence.get("submissions"), list)
                 else None,
             },
+            "storeSubmissionStarter": {
+                "manifestPath": "build/store-submission-starter/store-submission-starter-manifest.json",
+                "manifestPresent": store_submission_starter_manifest_path.exists(),
+                "manifestSha256": file_sha256(store_submission_starter_manifest_path)
+                if store_submission_starter_manifest_path.exists()
+                else None,
+                "packagePath": "build/store-submission-starter/mobile-store-submission-starter.zip",
+                "packagePresent": store_submission_starter_package_path.exists(),
+                "packageSha256": file_sha256(store_submission_starter_package_path)
+                if store_submission_starter_package_path.exists()
+                else None,
+                "flavorCount": len(store_submission_starter_manifest.get("flavors", []))
+                if isinstance(store_submission_starter_manifest.get("flavors"), list)
+                else None,
+                "disallowedValueMarkerHits": store_submission_starter_manifest.get(
+                    "disallowedValueMarkerHits",
+                    [],
+                ),
+            },
             "completionAudit": {
                 "path": "build/completion-audits/mobile-app-completion.json",
                 "generatedBy": "scripts/mobile_completion_audit.py",
@@ -4547,6 +4677,7 @@ def write_tenant_release_package(root: Path) -> Path:
             "Use the iOS CI handoff package to trigger and download unsigned iOS builds on a macOS GitHub Actions runner when local Xcode is unavailable.",
             "Use the store-signing handoff package to fill tenant-owned Apple export options and Android upload-signing placeholders outside Git.",
             "Use the store-publish config package to fill tenant-owned App Store, Google Play, or direct-distribution public release fields before submission.",
+            "Use the store-submission starter package to copy no-secret tenant-fillable evidence inputs before importing public store evidence.",
             "Import public store-submission evidence after tenant signing, TestFlight, Play internal testing, or direct-distribution setup is complete.",
             "Replace template signing material outside this repository before store submission.",
             "Run check_mobile, release manifest generation, store handoff, store assets export, tenant release package, and completion audit.",
@@ -4580,6 +4711,8 @@ def check_tenant_release_package(root: Path) -> Check:
         "build/store-publish-config/mobile-store-publish-config.zip",
         "build/store-submission-evidence/store-submission-evidence.json",
         "build/store-submission-evidence/store-submission-evidence.template.json",
+        "build/store-submission-starter/store-submission-starter-manifest.json",
+        "build/store-submission-starter/mobile-store-submission-starter.zip",
         "build/release-manifests/mobile-artifacts.json",
         "README.md",
         "docs/open-source-release.md",
@@ -4744,6 +4877,38 @@ def check_tenant_release_package(root: Path) -> Check:
                 or store_submission.get("guideSha256") != file_sha256(store_submission_guide_path)
             ):
                 problems.append("manifests.storeSubmissionEvidence.guideSha256")
+        store_submission_starter = manifests.get("storeSubmissionStarter")
+        store_submission_starter_manifest_path = (
+            root / "build" / "store-submission-starter" / "store-submission-starter-manifest.json"
+        )
+        store_submission_starter_package_path = (
+            root / "build" / "store-submission-starter" / "mobile-store-submission-starter.zip"
+        )
+        if not isinstance(store_submission_starter, dict):
+            problems.append("manifests.storeSubmissionStarter")
+        else:
+            if store_submission_starter.get("manifestPath") != "build/store-submission-starter/store-submission-starter-manifest.json":
+                problems.append("manifests.storeSubmissionStarter.manifestPath")
+            if store_submission_starter.get("packagePath") != "build/store-submission-starter/mobile-store-submission-starter.zip":
+                problems.append("manifests.storeSubmissionStarter.packagePath")
+            if store_submission_starter.get("manifestPresent") is not True:
+                problems.append("manifests.storeSubmissionStarter.manifestPresent")
+            if store_submission_starter.get("packagePresent") is not True:
+                problems.append("manifests.storeSubmissionStarter.packagePresent")
+            if store_submission_starter.get("flavorCount") != len(FLAVORS):
+                problems.append("manifests.storeSubmissionStarter.flavorCount")
+            if store_submission_starter.get("disallowedValueMarkerHits") != []:
+                problems.append("manifests.storeSubmissionStarter.disallowedValueMarkerHits")
+            if (
+                not store_submission_starter_manifest_path.exists()
+                or store_submission_starter.get("manifestSha256") != file_sha256(store_submission_starter_manifest_path)
+            ):
+                problems.append("manifests.storeSubmissionStarter.manifestSha256")
+            if (
+                not store_submission_starter_package_path.exists()
+                or store_submission_starter.get("packageSha256") != file_sha256(store_submission_starter_package_path)
+            ):
+                problems.append("manifests.storeSubmissionStarter.packageSha256")
     open_source = package.get("openSourceBoundary")
     if not isinstance(open_source, dict):
         problems.append("openSourceBoundary")
@@ -4827,7 +4992,7 @@ def check_tenant_release_package(root: Path) -> Check:
     return Check(
         "tenant_release_package",
         "passed",
-        "Public tenant release package links store handoff, store assets package, iOS CI handoff, store signing handoff, store publish config, store submission evidence, Android artifacts, open-source docs, per-flavor tenant actions, and no-secret boundaries for tenant app publishing.",
+        "Public tenant release package links store handoff, store assets package, iOS CI handoff, store signing handoff, store publish config, store submission starter, store submission evidence, Android artifacts, open-source docs, per-flavor tenant actions, and no-secret boundaries for tenant app publishing.",
         evidence,
     )
 
@@ -5136,6 +5301,7 @@ def build_report(root: Path, strict_ios: bool) -> dict[str, Any]:
         check_ios_ci_handoff_package(root),
         check_store_signing_handoff_package(root),
         check_store_publish_config_package(root),
+        check_store_submission_starter_package(root),
         check_ios_build_matrix(root),
         check_ios_ci_artifact_evidence(root),
         check_store_handoff_manifest(root),
