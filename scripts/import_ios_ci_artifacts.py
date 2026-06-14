@@ -76,6 +76,8 @@ def marker_hits(value: Any) -> list[str]:
 def candidate_app_paths(source_dir: Path, flavor: str) -> list[Path]:
     expected = FLAVORS[flavor]
     candidates = [
+        source_dir / flavor,
+        source_dir / expected["artifactName"],
         source_dir / flavor / "Runner.app",
         source_dir / expected["artifactName"] / "Runner.app",
         source_dir / flavor / "Payload" / "Runner.app",

@@ -10,6 +10,7 @@ import tempfile
 import zipfile
 import hashlib
 import json
+import plistlib
 from pathlib import Path
 from unittest import mock
 
@@ -18,6 +19,7 @@ import export_completion_unblocker
 import export_github_publish_handoff
 import export_ios_ci_handoff
 import import_github_publication_evidence
+import import_ios_ci_artifacts
 import import_store_submission_evidence
 import mobile_completion_audit
 import mobile_completion_closure
@@ -643,6 +645,40 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn('cp "$source_config" "$ios_config"', script)
         self.assertIn('"$flutter_bin" build ios "--$mode" --no-codesign --dart-define="APP_FLAVOR=$flavor"', script)
         self.assertNotIn('"$flutter_bin" build ios "--$mode" --flavor "$flavor"', script)
+
+    def test_ios_ci_importer_accepts_downloaded_artifact_bundle_contents(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        build_root = root / "build"
+        build_root.mkdir(exist_ok=True)
+
+        with tempfile.TemporaryDirectory(dir=build_root) as temp_dir:
+            temp_root = Path(temp_dir)
+            source_dir = temp_root / "ci-ios"
+            output = temp_root / "ios-ci-evidence" / "ios-ci-artifacts.json"
+            info_dir = temp_root / "ios-ci-evidence" / "app-info"
+            for flavor, expected in import_ios_ci_artifacts.FLAVORS.items():
+                app_contents = source_dir / expected["artifactName"]
+                app_contents.mkdir(parents=True)
+                with (app_contents / "Info.plist").open("wb") as target:
+                    plistlib.dump(
+                        {
+                            "CFBundleIdentifier": expected["applicationId"],
+                            "CFBundleDisplayName": expected["appName"],
+                            "CFBundleVersion": "1",
+                            "CFBundleShortVersionString": "0.1.0",
+                        },
+                        target,
+                    )
+
+            report = import_ios_ci_artifacts.import_artifacts(
+                source_dir,
+                output,
+                info_dir,
+            )
+
+        self.assertEqual("passed", report["result"])
+        self.assertEqual([], report["missingFlavors"])
+        self.assertEqual(set(import_ios_ci_artifacts.FLAVORS), {run["flavor"] for run in report["runs"]})
 
     def test_open_source_package_keeps_ci_scripts_executable(self) -> None:
         root = Path(__file__).resolve().parents[1]
