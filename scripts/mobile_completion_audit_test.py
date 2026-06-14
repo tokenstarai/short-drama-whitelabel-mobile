@@ -595,6 +595,21 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertRegex(report["sourceManifestSha256"], r"^[a-f0-9]{64}$")
         self.assertEqual([], report["disallowedValueMarkerHits"])
 
+    def test_open_source_package_uses_standalone_github_actions_paths(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        package_path = root / "build" / "open-source" / "short-drama-whitelabel-mobile.zip"
+
+        with zipfile.ZipFile(package_path) as archive:
+            workflow = archive.read(
+                "short-drama-whitelabel-mobile/.github/workflows/mobile-flutter.yml",
+            ).decode("utf-8")
+
+        self.assertNotIn("working-directory: mobile", workflow)
+        self.assertNotIn('"mobile/**"', workflow)
+        self.assertNotIn("mobile/build/", workflow)
+        self.assertIn("working-directory: .", workflow)
+        self.assertIn("build/open-source/short-drama-whitelabel-mobile.zip", workflow)
+
     def test_store_handoff_manifest_is_public_and_actionable(self) -> None:
         root = Path(__file__).resolve().parents[1]
 

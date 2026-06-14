@@ -135,11 +135,26 @@ def iter_entries() -> list[tuple[str, Path]]:
     return sorted(deduped.items())
 
 
+def standalone_workflow_text(text: str) -> str:
+    return (
+        text.replace('      - "mobile/**"', '      - "**"')
+        .replace("working-directory: mobile", "working-directory: .")
+        .replace("mobile/build/", "build/")
+    )
+
+
+def packaged_bytes(entry_path: str, source_path: Path) -> bytes:
+    if entry_path == ".github/workflows/mobile-flutter.yml":
+        text = source_path.read_text(encoding="utf-8")
+        return standalone_workflow_text(text).encode("utf-8")
+    return source_path.read_bytes()
+
+
 def disallowed_value_hits(entries: list[tuple[str, Path]]) -> list[dict[str, str]]:
     hits: list[dict[str, str]] = []
     for entry_path, source_path in entries:
         try:
-            text = source_path.read_text(encoding="utf-8", errors="ignore")
+            text = packaged_bytes(entry_path, source_path).decode("utf-8", errors="ignore")
         except OSError:
             continue
         if source_path.name in {
@@ -184,15 +199,15 @@ def write_package(entries: list[tuple[str, Path]], package_path: Path) -> None:
             info.date_time = (2026, 1, 1, 0, 0, 0)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, source_path.read_bytes())
+            archive.writestr(info, packaged_bytes(entry_path, source_path))
 
 
 def build_manifest(entries: list[tuple[str, Path]], package_path: Path) -> dict[str, object]:
     entry_records = [
         {
             "path": entry_path,
-            "sizeBytes": source_path.stat().st_size,
-            "sha256": sha256_file(source_path),
+            "sizeBytes": len(packaged_bytes(entry_path, source_path)),
+            "sha256": sha256_bytes(packaged_bytes(entry_path, source_path)),
         }
         for entry_path, source_path in entries
     ]
