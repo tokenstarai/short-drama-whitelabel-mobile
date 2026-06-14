@@ -4953,6 +4953,21 @@ def check_tenant_portal_release_handoff(root: Path) -> Check:
         missing.append("main:storeSubmissionEvidence")
     if "storeSubmissionEvidenceGuide" not in main_text:
         missing.append("main:storeSubmissionEvidenceGuide")
+    required_main_markers = [
+        "商店提交证据清单",
+        "allowedStatuses",
+        "requiredFlags",
+        "publicEvidenceExamples",
+        "evidenceTemplatePath",
+        "evidenceGuidePath",
+        "importCommand",
+        "publicBoundary",
+    ]
+    missing.extend(
+        f"main:{marker}"
+        for marker in required_main_markers
+        if marker not in main_text
+    )
     forbidden_runtime_markers = [
         "sk_live_",
         "sk_test_",

@@ -324,6 +324,15 @@ class MobileCompletionAuditTest(unittest.TestCase):
             "store submission evidence checklist",
             checks["tenant_portal_release_handoff"]["detail"],
         )
+        tenant_portal_main = (root.parent / "apps" / "tenant-portal" / "src" / "main.tsx").read_text(
+            encoding="utf-8",
+        )
+        self.assertIn("商店提交证据清单", tenant_portal_main)
+        self.assertIn("allowedStatuses", tenant_portal_main)
+        self.assertIn("requiredFlags", tenant_portal_main)
+        self.assertIn("publicEvidenceExamples", tenant_portal_main)
+        self.assertIn("importCommand", tenant_portal_main)
+        self.assertIn("publicBoundary", tenant_portal_main)
         self.assertIn(
             './scripts/build_flavor.sh "${{ matrix.flavor }}" android release apk',
             workflow,
