@@ -194,6 +194,14 @@ Run this after the open-source package is ready when a maintainer needs the exac
 
 The script writes `build/github-publish/github-publish-manifest.json`, `github-publish-guide.md`, and `github-release-notes.md`. It records the intended public repository name, release tag, package hashes, release assets, and `gh` commands for creating the repository and release from the open-source zip. It does not create a GitHub repository, push code, publish a release, store GitHub credentials, or bypass the no-secret package review.
 
+After the maintainer has created the public repository and release, import public publication evidence:
+
+```bash
+./scripts/import_github_publication_evidence.py --repo <owner>/short-drama-whitelabel-mobile --strict
+```
+
+The importer writes `build/github-publish/github-publication-evidence.json`. It records repository visibility, default branch, release tag, release assets, local open-source package hashes, and no-secret scan results. It uses GitHub CLI to read public metadata only; it does not store GitHub tokens or tenant credentials.
+
 ## CI Boundary
 
 `.github/workflows/mobile-flutter.yml` runs:

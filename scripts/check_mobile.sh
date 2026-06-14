@@ -25,6 +25,7 @@ python3 -m py_compile \
   "$script_dir/export_store_publish_config.py" \
   "$script_dir/export_store_signing_handoff.py" \
   "$script_dir/import_ios_ci_artifacts.py" \
+  "$script_dir/import_github_publication_evidence.py" \
   "$script_dir/import_store_submission_evidence.py" \
   "$script_dir/mobile_completion_closure.py" \
   "$script_dir/mobile_completion_audit.py" \

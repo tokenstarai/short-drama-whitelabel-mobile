@@ -16,6 +16,7 @@ from unittest import mock
 import download_ios_ci_artifacts
 import export_completion_unblocker
 import export_github_publish_handoff
+import import_github_publication_evidence
 import import_store_submission_evidence
 import mobile_completion_audit
 import mobile_completion_closure
@@ -206,6 +207,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn("store_submission_evidence", checks)
         self.assertIn("completion_unblocker_package", checks)
         self.assertIn("github_publish_handoff_package", checks)
+        self.assertIn("github_publication_evidence", checks)
         self.assertIn("store_handoff_manifest", checks)
         self.assertIn("store_assets_package", checks)
         self.assertIn("tenant_release_package", checks)
@@ -224,6 +226,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn(checks["store_submission_evidence"]["status"], {"passed", "blocked"})
         self.assertEqual("passed", checks["completion_unblocker_package"]["status"])
         self.assertEqual("passed", checks["github_publish_handoff_package"]["status"])
+        self.assertIn(checks["github_publication_evidence"]["status"], {"passed", "blocked"})
         self.assertEqual("passed", checks["store_handoff_manifest"]["status"])
         self.assertEqual("passed", checks["store_assets_package"]["status"])
         self.assertEqual("passed", checks["tenant_release_package"]["status"])
@@ -326,6 +329,10 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn(
             "build/github-publish/github-publish-manifest.json",
             checks["github_publish_handoff_package"]["evidence"],
+        )
+        self.assertIn(
+            "build/github-publish/github-publication-evidence.json",
+            checks["github_publication_evidence"]["evidence"],
         )
         self.assertIn("mobile-${{ matrix.flavor }}-ios-unsigned", workflow)
         self.assertIn("ios-ci-evidence:", workflow)
@@ -489,6 +496,104 @@ class MobileCompletionAuditTest(unittest.TestCase):
         lowered = json.dumps(manifest, ensure_ascii=False).lower() + guide.lower() + notes.lower()
         for marker in export_github_publish_handoff.FORBIDDEN_MARKERS:
             self.assertNotIn(marker, lowered)
+
+    def test_github_publication_evidence_gate_validates_public_repo_release(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            evidence_dir = root / "build" / "github-publish"
+            evidence_path = evidence_dir / "github-publication-evidence.json"
+            evidence_dir.mkdir(parents=True)
+            evidence_path.write_text(
+                json.dumps({
+                    "schemaVersion": 1,
+                    "result": "passed",
+                    "repository": {
+                        "nameWithOwner": "tokenstarai/short-drama-whitelabel-mobile",
+                        "url": "https://github.com/tokenstarai/short-drama-whitelabel-mobile",
+                        "visibility": "PUBLIC",
+                        "defaultBranch": "main",
+                        "pushedCommit": "5e730fe",
+                    },
+                    "release": {
+                        "tagName": "mobile-template-v0.1.0",
+                        "url": "https://github.com/tokenstarai/short-drama-whitelabel-mobile/releases/tag/mobile-template-v0.1.0",
+                        "isDraft": False,
+                        "isPrerelease": False,
+                    },
+                    "assets": [
+                        {
+                            "name": "short-drama-whitelabel-mobile.zip",
+                            "contentType": "application/zip",
+                            "sizeBytes": 123,
+                            "downloadUrl": "https://github.com/tokenstarai/short-drama-whitelabel-mobile/releases/download/mobile-template-v0.1.0/short-drama-whitelabel-mobile.zip",
+                        },
+                        {
+                            "name": "open-source-template-manifest.json",
+                            "contentType": "application/json",
+                            "sizeBytes": 456,
+                            "downloadUrl": "https://github.com/tokenstarai/short-drama-whitelabel-mobile/releases/download/mobile-template-v0.1.0/open-source-template-manifest.json",
+                        },
+                    ],
+                    "sourcePackageSha256": "a" * 64,
+                    "sourceManifestSha256": "b" * 64,
+                    "disallowedValueMarkerHits": [],
+                }),
+                encoding="utf-8",
+            )
+
+            check = mobile_completion_audit.check_github_publication_evidence(root)
+
+        self.assertEqual("github_publication_evidence", check.id)
+        self.assertEqual("passed", check.status)
+        self.assertIn("build/github-publish/github-publication-evidence.json", check.evidence)
+
+    def test_github_publication_evidence_importer_normalizes_public_release(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            package = root / "build" / "open-source" / "short-drama-whitelabel-mobile.zip"
+            manifest = root / "build" / "open-source" / "open-source-template-manifest.json"
+            package.parent.mkdir(parents=True)
+            package.write_bytes(b"zip")
+            manifest.write_text("{}", encoding="utf-8")
+
+            report = import_github_publication_evidence.build_report(
+                root=root,
+                repo_info={
+                    "nameWithOwner": "tokenstarai/short-drama-whitelabel-mobile",
+                    "url": "https://github.com/tokenstarai/short-drama-whitelabel-mobile",
+                    "visibility": "PUBLIC",
+                    "defaultBranchRef": {"name": "main", "target": {"oid": "abc123"}},
+                },
+                release_info={
+                    "tagName": "mobile-template-v0.1.0",
+                    "url": "https://github.com/tokenstarai/short-drama-whitelabel-mobile/releases/tag/mobile-template-v0.1.0",
+                    "isDraft": False,
+                    "isPrerelease": False,
+                    "assets": [
+                        {
+                            "name": "short-drama-whitelabel-mobile.zip",
+                            "contentType": "application/zip",
+                            "size": 123,
+                            "url": "https://github.com/download/short-drama-whitelabel-mobile.zip",
+                        },
+                        {
+                            "name": "open-source-template-manifest.json",
+                            "contentType": "application/json",
+                            "size": 456,
+                            "url": "https://github.com/download/open-source-template-manifest.json",
+                        },
+                    ],
+                },
+            )
+
+        self.assertEqual("passed", report["result"])
+        self.assertEqual("main", report["repository"]["defaultBranch"])
+        self.assertEqual("abc123", report["repository"]["pushedCommit"])
+        self.assertEqual("mobile-template-v0.1.0", report["release"]["tagName"])
+        self.assertEqual(["open-source-template-manifest.json", "short-drama-whitelabel-mobile.zip"], sorted(asset["name"] for asset in report["assets"]))
+        self.assertRegex(report["sourcePackageSha256"], r"^[a-f0-9]{64}$")
+        self.assertRegex(report["sourceManifestSha256"], r"^[a-f0-9]{64}$")
+        self.assertEqual([], report["disallowedValueMarkerHits"])
 
     def test_store_handoff_manifest_is_public_and_actionable(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -1007,6 +1112,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
                 "lib/main.dart",
                 "scripts/export_completion_unblocker.py",
                 "scripts/export_github_publish_handoff.py",
+                "scripts/import_github_publication_evidence.py",
                 "scripts/import_store_submission_evidence.py",
                 "scripts/mobile_completion_closure.py",
                 "assets/config/hongguo/tenant.brand.json",

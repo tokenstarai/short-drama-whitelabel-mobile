@@ -639,6 +639,7 @@ def check_required_files(root: Path) -> Check:
         "scripts/download_ios_ci_artifacts.py",
         "scripts/export_completion_unblocker.py",
         "scripts/export_github_publish_handoff.py",
+        "scripts/import_github_publication_evidence.py",
         "scripts/import_store_submission_evidence.py",
         "scripts/mobile_completion_closure.py",
         "features-placeholder",
@@ -1300,6 +1301,7 @@ def check_mobile_open_source_package(root: Path) -> Check:
         "lib/main.dart",
         "scripts/export_completion_unblocker.py",
         "scripts/export_github_publish_handoff.py",
+        "scripts/import_github_publication_evidence.py",
         "scripts/import_store_submission_evidence.py",
         "scripts/mobile_completion_closure.py",
         "assets/config/hongguo/tenant.brand.json",
@@ -2860,6 +2862,100 @@ def check_github_publish_handoff_package(root: Path) -> Check:
         "github_publish_handoff_package",
         "passed",
         "GitHub publish handoff package exports no-secret public repository, release asset, release-note, checksum, and command metadata for the open-source mobile template.",
+        evidence,
+    )
+
+
+def check_github_publication_evidence(root: Path) -> Check:
+    evidence_path = root / "build" / "github-publish" / "github-publication-evidence.json"
+    evidence = ["build/github-publish/github-publication-evidence.json"]
+    if not evidence_path.exists():
+        return Check(
+            "github_publication_evidence",
+            "blocked",
+            "GitHub publication evidence is missing; publish the open-source template repository/release and import public evidence.",
+            evidence,
+        )
+    try:
+        report = json.loads(read_text(evidence_path))
+    except json.JSONDecodeError as error:
+        return Check(
+            "github_publication_evidence",
+            "failed",
+            f"GitHub publication evidence is invalid JSON: {error}",
+            evidence,
+        )
+
+    problems: list[str] = []
+    if report.get("schemaVersion") != 1:
+        problems.append("schemaVersion")
+    if report.get("result") != "passed":
+        problems.append(f"result={report.get('result')!r}")
+    repository = report.get("repository")
+    if not isinstance(repository, dict):
+        problems.append("repository")
+        repository = {}
+    if repository.get("nameWithOwner") != "tokenstarai/short-drama-whitelabel-mobile":
+        problems.append("repository.nameWithOwner")
+    if repository.get("visibility") not in {"PUBLIC", "public"}:
+        problems.append("repository.visibility")
+    if repository.get("defaultBranch") != "main":
+        problems.append("repository.defaultBranch")
+    if not isinstance(repository.get("url"), str) or "github.com/tokenstarai/short-drama-whitelabel-mobile" not in repository.get("url", ""):
+        problems.append("repository.url")
+    release = report.get("release")
+    if not isinstance(release, dict):
+        problems.append("release")
+        release = {}
+    if release.get("tagName") != "mobile-template-v0.1.0":
+        problems.append("release.tagName")
+    if release.get("isDraft") is not False:
+        problems.append("release.isDraft")
+    if release.get("isPrerelease") is not False:
+        problems.append("release.isPrerelease")
+    if not isinstance(release.get("url"), str) or "/releases/tag/mobile-template-v0.1.0" not in release.get("url", ""):
+        problems.append("release.url")
+    assets = report.get("assets")
+    if not isinstance(assets, list):
+        problems.append("assets")
+        assets = []
+    by_asset = {
+        str(asset.get("name")): asset
+        for asset in assets
+        if isinstance(asset, dict)
+    }
+    for asset_name in [
+        "short-drama-whitelabel-mobile.zip",
+        "open-source-template-manifest.json",
+    ]:
+        asset = by_asset.get(asset_name)
+        if not isinstance(asset, dict):
+            problems.append(f"asset:{asset_name}")
+            continue
+        if not isinstance(asset.get("sizeBytes"), int) or asset.get("sizeBytes", 0) <= 0:
+            problems.append(f"asset:{asset_name}:sizeBytes")
+        if not isinstance(asset.get("downloadUrl"), str) or asset_name not in asset.get("downloadUrl", ""):
+            problems.append(f"asset:{asset_name}:downloadUrl")
+    for key in ["sourcePackageSha256", "sourceManifestSha256"]:
+        value = report.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):
+            problems.append(key)
+    if report.get("disallowedValueMarkerHits"):
+        problems.append(f"disallowedValueMarkerHits={report.get('disallowedValueMarkerHits')!r}")
+    forbidden_hits = export_github_publish_handoff.marker_hits(report)
+    if forbidden_hits:
+        problems.append(f"forbiddenMarkers={forbidden_hits!r}")
+    if problems:
+        return Check(
+            "github_publication_evidence",
+            "failed",
+            f"GitHub publication evidence problems: {', '.join(problems)}",
+            evidence,
+        )
+    return Check(
+        "github_publication_evidence",
+        "passed",
+        "GitHub publication evidence confirms the public template repository, release tag, zip asset, manifest asset, hashes, and no-secret boundary.",
         evidence,
     )
 
@@ -4933,6 +5029,7 @@ def build_report(root: Path, strict_ios: bool) -> dict[str, Any]:
         check_mobile_open_source_release(root),
         check_mobile_open_source_package(root),
         check_github_publish_handoff_package(root),
+        check_github_publication_evidence(root),
         check_ios_static_release_config(root),
         check_ios_ci_handoff_package(root),
         check_store_signing_handoff_package(root),
