@@ -20,6 +20,7 @@ DEFAULT_OUTPUT_DIR = ROOT / "build" / "open-source"
 
 REQUIRED_ENTRIES = [
     ".github/workflows/mobile-flutter.yml",
+    ".gitignore",
     "LICENSE",
     "README.md",
     "docs/open-source-release.md",
@@ -126,8 +127,11 @@ def iter_mobile_files() -> Iterable[tuple[str, Path]]:
 
 
 def iter_entries() -> list[tuple[str, Path]]:
-    entries = [(".github/workflows/mobile-flutter.yml", REPO_ROOT / ".github" / "workflows" / "mobile-flutter.yml")]
-    entries.extend(iter_mobile_files())
+    entries = list(iter_mobile_files())
+    entries.extend([
+        (".github/workflows/mobile-flutter.yml", REPO_ROOT / ".github" / "workflows" / "mobile-flutter.yml"),
+        (".gitignore", REPO_ROOT / ".gitignore"),
+    ])
     deduped: dict[str, Path] = {}
     for entry_path, source_path in entries:
         if source_path.exists() and source_path.is_file():

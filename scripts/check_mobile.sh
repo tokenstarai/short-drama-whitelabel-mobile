@@ -42,7 +42,11 @@ python3 "$script_dir/import_store_submission_evidence.py"
 python3 "$script_dir/export_completion_unblocker.py"
 python3 "$script_dir/export_open_source_template.py"
 python3 "$script_dir/export_github_publish_handoff.py"
-python3 "$script_dir/mobile_completion_audit_test.py"
+if [[ -f "$mobile_dir/../.github/workflows/mobile-flutter.yml" && -d "$mobile_dir/../apps/tenant-portal" ]]; then
+  python3 "$script_dir/mobile_completion_audit_test.py"
+else
+  echo "Skipping monorepo completion audit tests in standalone template layout."
+fi
 "$flutter_bin" analyze
 "$flutter_bin" test
 "$script_dir/check_native_config.sh"

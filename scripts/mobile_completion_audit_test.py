@@ -16,6 +16,7 @@ from unittest import mock
 import download_ios_ci_artifacts
 import export_completion_unblocker
 import export_github_publish_handoff
+import export_ios_ci_handoff
 import import_github_publication_evidence
 import import_store_submission_evidence
 import mobile_completion_audit
@@ -185,9 +186,8 @@ class MobileCompletionAuditTest(unittest.TestCase):
 
         report = mobile_completion_audit.build_report(root, strict_ios=False)
         checks = {check["id"]: check for check in report["checks"]}
-        workflow = (root.parent / ".github" / "workflows" / "mobile-flutter.yml").read_text(
-            encoding="utf-8",
-        )
+        workflow_path, _ = mobile_completion_audit.resolve_workflow_path(root)
+        workflow = workflow_path.read_text(encoding="utf-8")
 
         self.assertIn("ci_workflow", checks)
         self.assertIn(
@@ -609,6 +609,32 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertNotIn("mobile/build/", workflow)
         self.assertIn("working-directory: .", workflow)
         self.assertIn("build/open-source/short-drama-whitelabel-mobile.zip", workflow)
+
+    def test_open_source_package_uses_root_secret_safe_gitignore(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        package_path = root / "build" / "open-source" / "short-drama-whitelabel-mobile.zip"
+
+        with zipfile.ZipFile(package_path) as archive:
+            gitignore = archive.read("short-drama-whitelabel-mobile/.gitignore").decode(
+                "utf-8",
+            )
+
+        self.assertIn(".env", gitignore)
+        self.assertIn(".env.*", gitignore)
+        self.assertIn(".dev.vars", gitignore)
+        self.assertIn("!.env.example", gitignore)
+        self.assertIn("build/", gitignore)
+
+    def test_ios_ci_handoff_resolves_standalone_workflow_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            workflow = root / ".github" / "workflows" / "mobile-flutter.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text("name: Mobile Flutter\nworkflow_dispatch:\n", encoding="utf-8")
+
+            resolved = export_ios_ci_handoff.resolve_workflow_path(root)
+
+        self.assertEqual(workflow, resolved)
 
     def test_open_source_package_keeps_ci_scripts_executable(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -1140,6 +1166,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
             package_path.parent.mkdir(parents=True)
             required = [
                 ".github/workflows/mobile-flutter.yml",
+                ".gitignore",
                 "LICENSE",
                 "README.md",
                 "docs/open-source-release.md",

@@ -14,7 +14,6 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = ROOT.parent
-WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "mobile-flutter.yml"
 STORE_HANDOFF = ROOT / "build" / "release-handoff" / "mobile-store-handoff.json"
 DEFAULT_OUTPUT_DIR = ROOT / "build" / "ios-ci-handoff"
 PACKAGE_NAME = "mobile-ios-ci-handoff"
@@ -67,10 +66,34 @@ def rel(path: Path, base: Path = ROOT) -> str:
     return path.relative_to(base).as_posix()
 
 
-def workflow_metadata() -> dict[str, Any]:
-    if not WORKFLOW_PATH.exists():
-        raise SystemExit(f"Missing workflow: {WORKFLOW_PATH.relative_to(REPO_ROOT)}")
-    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+def resolve_workflow_path(root: Path = ROOT) -> Path:
+    candidates = [
+        root.parent / ".github" / "workflows" / "mobile-flutter.yml",
+        root / ".github" / "workflows" / "mobile-flutter.yml",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def standalone_layout(root: Path = ROOT) -> bool:
+    return resolve_workflow_path(root).is_relative_to(root)
+
+
+def workflow_artifact_path(root: Path = ROOT) -> str:
+    return "build/ios/iphoneos/Runner.app" if standalone_layout(root) else "mobile/build/ios/iphoneos/Runner.app"
+
+
+def workflow_metadata(root: Path = ROOT) -> dict[str, Any]:
+    workflow_path = resolve_workflow_path(root)
+    if not workflow_path.exists():
+        try:
+            display_path = workflow_path.relative_to(root.parent)
+        except ValueError:
+            display_path = workflow_path
+        raise SystemExit(f"Missing workflow: {display_path}")
+    text = workflow_path.read_text(encoding="utf-8")
     required_markers = [
         "workflow_dispatch:",
         "ios-build:",
@@ -85,12 +108,13 @@ def workflow_metadata() -> dict[str, Any]:
     ]
     return {
         "path": ".github/workflows/mobile-flutter.yml",
-        "sha256": sha256_file(WORKFLOW_PATH),
+        "sha256": sha256_file(workflow_path),
         "workflowDispatch": "workflow_dispatch:" in text,
         "iosJob": "ios-build",
         "runner": "macos-15",
         "xcodeSetupAction": "maxim-lobanov/setup-xcode@v1",
         "xcodeVersion": "latest-stable",
+        "artifactPath": workflow_artifact_path(root),
         "requiredMarkersPresent": [
             marker
             for marker in required_markers
@@ -130,7 +154,7 @@ def flavor_handoff(entry: dict[str, Any]) -> dict[str, Any]:
             "runner": "macos-15",
             "matrixFlavor": flavor,
             "artifactName": artifact_name,
-            "artifactPath": "mobile/build/ios/iphoneos/Runner.app",
+            "artifactPath": workflow_artifact_path(),
             "debugCommand": f"./scripts/build_flavor.sh {flavor} ios debug",
             "releaseCommand": f"./scripts/build_flavor.sh {flavor} ios release",
         },
