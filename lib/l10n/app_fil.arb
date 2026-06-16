@@ -14,10 +14,14 @@
   "playbackTokenFailed": "Nabigo ang playback authorization. Subukan muli.",
   "cardRedeem": "I-redeem ang Card",
   "onlinePayment": "Online Top Up",
+  "paymentFailed": "Nabigo ang pagbabayad. Pumili ng ibang paraan o subukan muli.",
   "accountDelete": "Burahin ang Account",
+  "authFailed": "Nabigo ang pag-sign in. Subukan muli o pumili ng ibang paraan.",
   "settings": "Mga Setting",
   "language": "Wika",
   "pointCardManagement": "Pamamahala ng Point Card",
   "noPointCardRecords": "Wala pang point card records",
+  "pointCardRedeemFailed": "Hindi magamit ang point card na ito. Suriin ito at subukan muli.",
+  "pointCardRedeemUnavailable": "Hindi available ang point card recharge sa build na ito.",
   "consumerWallet": "consumer wallet"
 }

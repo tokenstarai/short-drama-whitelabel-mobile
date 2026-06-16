@@ -66,6 +66,27 @@ class AuthFakeTransport implements AdapterTransport {
   }
 }
 
+class AuthErrorTransport implements AdapterTransport {
+  final List<AdapterRequest> requests = [];
+
+  @override
+  Future<AdapterResponse> send(AdapterRequest request) async {
+    requests.add(request);
+    return const AdapterResponse(
+      statusCode: 403,
+      body: '''
+        {
+          "error": {
+            "code": "APP_AUTH_PROVIDER_DISABLED",
+            "message": "Email login is disabled for this tenant.",
+            "requestId": "req_auth_raw"
+          }
+        }
+      ''',
+    );
+  }
+}
+
 class TestOAuthCallbackLinks implements OAuthCallbackLinks {
   TestOAuthCallbackLinks({Uri? initialLink})
       : _initialLink = Future.value(initialLink);
@@ -350,5 +371,40 @@ void main() {
       find.textContaining('Auth provider facebook is not enabled'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('auth maps Tenant Edge errors to friendly text', (
+    tester,
+  ) async {
+    final flavor = FlavorConfig.douyin();
+    final transport = AuthErrorTransport();
+    final runtime = AppRuntime(
+      flavor: flavor,
+      endUserRef: 'anon:pulsedrama-auth-error',
+      client: TenantAdapterClient(
+        baseUri: Uri.parse('https://tenant-edge.example.test'),
+        transport: transport,
+      ),
+    );
+    addTearDown(runtime.dispose);
+
+    await tester.pumpWidget(
+      AppRuntimeScope(
+        runtime: runtime,
+        child: MaterialApp(home: AuthScreen(flavor: flavor)),
+      ),
+    );
+
+    await tester.tap(find.text('Continue with email'));
+    await tester.pumpAndSettle();
+
+    expect(transport.requests.single.path, '/auth/email/start');
+    expect(
+      find.text('Sign-in failed. Please retry or choose another method.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('APP_AUTH_PROVIDER_DISABLED'), findsNothing);
+    expect(find.textContaining('req_auth_raw'), findsNothing);
+    expect(find.textContaining('Email login is disabled'), findsNothing);
   });
 }

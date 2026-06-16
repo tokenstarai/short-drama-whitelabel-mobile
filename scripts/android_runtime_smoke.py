@@ -21,6 +21,10 @@ DEFAULT_OUTPUT = ROOT / "build" / "runtime-smoke" / "android-runtime-smoke.json"
 DEFAULT_SCREENSHOT_DIR = ROOT / "build" / "runtime-smoke" / "screenshots"
 
 FLAVORS = {
+    "coolshow": {
+        "applicationId": "com.coolshow.short",
+        "appName": "CoolShow Short",
+    },
     "hongguo": {
         "applicationId": "com.shortdrama.goldfruit",
         "appName": "GoldFruit Drama",
@@ -114,7 +118,10 @@ def wait_for_boot(adb: str, device: str, *, timeout: int) -> None:
             check=False,
         ).strip()
         if booted == "1":
-            command_output([adb, "-s", device, "shell", "input", "keyevent", "82"], timeout=10, check=False)
+            try:
+                command_output([adb, "-s", device, "shell", "input", "keyevent", "82"], timeout=10, check=False)
+            except subprocess.TimeoutExpired:
+                pass
             return
         time.sleep(2)
     raise SmokeError(f"Android device {device} did not finish booting within {timeout}s.")

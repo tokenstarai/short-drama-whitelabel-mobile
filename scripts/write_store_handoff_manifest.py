@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 
-FLAVOR_ORDER = ["hongguo", "douyin", "hippo", "reelshort"]
+FLAVOR_ORDER = ["coolshow", "hongguo", "douyin", "hippo", "reelshort"]
 
 SCREEN_IDS = [
     "01_splash",
@@ -101,6 +101,9 @@ VISIBLE_PAYMENT_PROVIDERS_BY_MODE = {
 }
 
 LISTING_COPY_BY_TEMPLATE = {
+    "coolshow": (
+        "Fast overseas short drama episodes with gold unlocks, wallet, and point cards."
+    ),
     "hongguo_inspired": (
         "Short drama episodes, theater picks, and store-safe coin unlocks."
     ),
@@ -677,6 +680,7 @@ def flavor_entry(root: Path, flavor: str, release_artifacts: list[dict[str, Any]
 
 def deep_link_scheme(flavor: str) -> str:
     return {
+        "coolshow": "coolshowshort",
         "hongguo": "goldfruitdrama",
         "douyin": "pulsedrama",
         "hippo": "riverdrama",

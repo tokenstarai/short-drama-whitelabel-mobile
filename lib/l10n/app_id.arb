@@ -14,10 +14,14 @@
   "playbackTokenFailed": "Otorisasi pemutaran gagal. Coba lagi.",
   "cardRedeem": "Tukar Kartu",
   "onlinePayment": "Isi Saldo Online",
+  "paymentFailed": "Pembayaran gagal. Pilih metode lain atau coba lagi.",
   "accountDelete": "Hapus Akun",
+  "authFailed": "Masuk gagal. Coba lagi atau pilih metode lain.",
   "settings": "Pengaturan",
   "language": "Bahasa",
   "pointCardManagement": "Manajemen Kartu Poin",
   "noPointCardRecords": "Belum ada catatan kartu poin",
+  "pointCardRedeemFailed": "Kartu poin ini tidak dapat digunakan. Periksa lalu coba lagi.",
+  "pointCardRedeemUnavailable": "Isi ulang kartu poin tidak tersedia di build ini.",
   "consumerWallet": "dompet konsumen"
 }

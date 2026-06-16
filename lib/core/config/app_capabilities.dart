@@ -1,4 +1,5 @@
 enum StyleTemplate {
+  coolshow('coolshow'),
   hongguoInspired('hongguo_inspired'),
   douyinInspired('douyin_inspired'),
   hippoInspired('hippo_inspired'),

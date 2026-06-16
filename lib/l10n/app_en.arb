@@ -14,10 +14,14 @@
   "playbackTokenFailed": "Playback authorization failed. Please retry.",
   "cardRedeem": "Redeem Card",
   "onlinePayment": "Online Top Up",
+  "paymentFailed": "Payment failed. Please choose another method or retry.",
   "accountDelete": "Delete Account",
+  "authFailed": "Sign-in failed. Please retry or choose another method.",
   "settings": "Settings",
   "language": "Language",
   "pointCardManagement": "Point Card Management",
   "noPointCardRecords": "No point card records yet",
+  "pointCardRedeemFailed": "This point card cannot be used. Please check it and retry.",
+  "pointCardRedeemUnavailable": "Point card recharge is not available in this build.",
   "consumerWallet": "consumer wallet"
 }

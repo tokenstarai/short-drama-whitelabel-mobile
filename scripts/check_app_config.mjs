@@ -7,6 +7,21 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const mobileDir = join(scriptDir, "..");
 
 const flavors = {
+  coolshow: {
+    appName: "CoolShow Short",
+    bundleId: "com.coolshow.short",
+    tenantCode: "coolshow",
+    primaryColor: "#FFB23F",
+    styleTemplate: "coolshow",
+    styleEnum: "StyleTemplate.coolshow",
+    compliance: "android_direct",
+    complianceEnum: "StoreComplianceMode.androidDirect",
+    apiAdapterBase: "https://short-drama-saas-tenant-edge-staging.tokenstarai.workers.dev",
+    deepLinkScheme: "coolshowshort",
+    dartDefine: "QVBQX0ZMQVZPUj1jb29sc2hvdw==",
+    authProviders: ["email", "google", "facebook", "apple"],
+    paymentProviders: ["stripe", "paypal", "bank_transfer", "local_wallet", "crypto", "point_card"],
+  },
   hongguo: {
     appName: "GoldFruit Drama",
     bundleId: "com.shortdrama.goldfruit",

@@ -26,6 +26,7 @@ Future<void> showUnlockSheet(
         runtime.effectiveBrandPrimaryColor,
       );
       final paymentProviders = runtime.effectivePaymentProviderWireValues;
+      final dark = tokens.background.computeLuminance() < 0.25;
       return SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
@@ -38,18 +39,77 @@ Future<void> showUnlockSheet(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                strings.unlockEpisode,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      tokens.primary,
+                      tokens.secondary,
+                      tokens.posterTint,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(tokens.radius),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.lock_open_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            strings.unlockEpisode,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      strings.episodeCostPoints(2),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      tokens.walletPitch,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              Text('${strings.episodeCostPoints(2)} ${tokens.walletPitch}'),
               const SizedBox(height: 16),
               FeatureGate(
                 enabled: features.enableAdsUnlock,
                 child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: dark ? Colors.white : tokens.primary,
+                  ),
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -66,6 +126,9 @@ Future<void> showUnlockSheet(
               FeatureGate(
                 enabled: runtime.canRedeemConsumerPointCards,
                 child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: dark ? Colors.white : tokens.primary,
+                  ),
                   onPressed: () {
                     final navigator = Navigator.of(context);
                     navigator.pop();
@@ -82,6 +145,9 @@ Future<void> showUnlockSheet(
               for (final provider in paymentProviders)
                 if (provider != ConsumerPaymentProvider.pointCard.wireValue)
                   OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: dark ? Colors.white : tokens.primary,
+                    ),
                     onPressed: () {
                       final navigator = Navigator.of(context);
                       navigator.pop();

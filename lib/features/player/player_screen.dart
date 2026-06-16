@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../app/app_runtime.dart';
@@ -6,6 +7,7 @@ import '../../core/api/app_models.dart';
 import '../../core/i18n/app_strings.dart';
 import '../../flavor/flavor.dart';
 import '../../theme/template_theme.dart';
+import '../../theme/template_visuals.dart';
 import '../unlock/unlock_sheet.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -38,6 +40,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool loading = false;
   late String episodeId;
   late String episodeTitle;
+  final playIdempotencyKeys = <String, String>{};
 
   @override
   void initState() {
@@ -65,20 +68,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
     try {
       final runtime = AppRuntimeScope.of(context);
-      final result = await runtime.authorizePlayback(
+      final targetEpisodeId = episodeId;
+      final idempotencyKey = playIdempotencyKeyFor(targetEpisodeId);
+      var result = await runtime.authorizePlayback(
         dramaId: widget.dramaId,
-        episodeId: episodeId,
+        episodeId: targetEpisodeId,
         endUserRef: runtime.endUserRef,
-        idempotencyKey:
-            'play-${widget.dramaId}-$episodeId-${DateTime.now().millisecondsSinceEpoch}',
+        idempotencyKey: idempotencyKey,
       );
+      if (playbackTokenNeedsRefresh(result)) {
+        result = await runtime.authorizePlayback(
+          dramaId: widget.dramaId,
+          episodeId: targetEpisodeId,
+          endUserRef: runtime.endUserRef,
+          idempotencyKey: idempotencyKey,
+        );
+        if (playbackTokenNeedsRefresh(result)) {
+          throw const AppApiException(
+            code: 'APP_PLAYBACK_TOKEN_FAILED',
+            message: 'Playback token expired after refresh.',
+            requestId: 'local_playback_refresh',
+          );
+        }
+      }
       if (!mounted) {
         return;
       }
       runtime.recordPlayback(
         dramaId: widget.dramaId,
         dramaTitle: widget.dramaTitle,
-        episodeId: episodeId,
+        episodeId: targetEpisodeId,
         episodeTitle: episodeTitle,
       );
       setState(() {
@@ -100,6 +119,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  String playIdempotencyKeyFor(String targetEpisodeId) {
+    final key = '${widget.dramaId}/$targetEpisodeId';
+    return playIdempotencyKeys.putIfAbsent(
+      key,
+      () => 'play-${widget.dramaId}-$targetEpisodeId-'
+          '${DateTime.now().millisecondsSinceEpoch}',
+    );
+  }
+
   List<DramaEpisode> get readyEpisodes {
     return widget.episodes.where((episode) => episode.ready).toList();
   }
@@ -107,6 +135,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   int get readyEpisodeIndex {
     return readyEpisodes
         .indexWhere((episode) => episode.episodeId == episodeId);
+  }
+
+  String get shareLink {
+    return '${widget.flavor.deepLinkScheme}://dramas/'
+        '${Uri.encodeComponent(widget.dramaId)}/episodes/'
+        '${Uri.encodeComponent(episodeId)}';
   }
 
   bool get canGoPrevious => readyEpisodeIndex > 0;
@@ -127,6 +161,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
     final nextEpisode = episodes[nextIndex];
+    selectEpisode(nextEpisode);
+  }
+
+  void selectEpisode(DramaEpisode nextEpisode) {
     setState(() {
       episodeId = nextEpisode.episodeId;
       episodeTitle = nextEpisode.title;
@@ -134,6 +172,144 @@ class _PlayerScreenState extends State<PlayerScreen> {
       error = null;
       loading = false;
     });
+  }
+
+  Future<void> showEpisodeList(AppStrings strings, TemplateTokens tokens) {
+    final episodes = readyEpisodes;
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            itemCount: episodes.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    strings.episodeList,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                );
+              }
+              final episode = episodes[index - 1];
+              final selected = episode.episodeId == episodeId;
+              return ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(tokens.radius),
+                  side: BorderSide(
+                    color: selected
+                        ? tokens.primary
+                        : tokens.primary.withValues(alpha: 0.14),
+                  ),
+                ),
+                leading: Icon(
+                  selected
+                      ? Icons.play_circle_fill_rounded
+                      : Icons.play_circle_outline,
+                  color: tokens.primary,
+                ),
+                title: Text(episode.title),
+                subtitle: Text(strings.episodeCostPoints(episode.pointPrice)),
+                trailing: selected ? const Icon(Icons.check_rounded) : null,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  if (!selected) {
+                    selectEpisode(episode);
+                  }
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> showShareSheet(AppStrings strings, TemplateTokens tokens) {
+    final link = shareLink;
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  strings.shareDrama,
+                  style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  widget.dramaTitle,
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  episodeTitle,
+                  style: Theme.of(sheetContext).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  strings.tenantSafeShareLink,
+                  style: Theme.of(sheetContext).textTheme.labelLarge?.copyWith(
+                        color: tokens.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: tokens.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(tokens.radius),
+                    border: Border.all(
+                      color: tokens.primary.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: SelectableText(
+                    link,
+                    style: Theme.of(sheetContext).textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: link));
+                      if (!mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(strings.shareLinkCopied)),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_rounded),
+                    label: Text(strings.copyLink),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -154,24 +330,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: Stack(
           children: [
             Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      tokens.posterTint,
-                      tokens.primary.withValues(alpha: 0.78),
-                      Colors.black,
-                    ],
-                  ),
-                ),
+              child: DramaSceneBackdrop(
+                tokens: tokens,
+                title: widget.dramaTitle,
+                index: 3,
                 child: Center(
                   child: authorization == null
-                      ? Icon(
-                          Icons.play_circle_fill_rounded,
-                          size: 84,
-                          color: tokens.onMedia.withValues(alpha: 0.78),
+                      ? _PreAuthorizationVideoOverlay(
+                          tokens: tokens,
+                          dramaTitle: widget.dramaTitle,
+                          episodeTitle: episodeTitle,
                         )
                       : _AuthorizedVideoView(
                           authorization: authorization!,
@@ -195,7 +363,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               bottom: 120,
               child: Column(
                 children: [
-                  IconButton(
+                  _PlayerActionButton(
                     tooltip: strings.favorites,
                     onPressed: () => runtime.toggleFavorite(
                       dramaId: widget.dramaId,
@@ -203,13 +371,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ),
                     icon: Icon(
                       isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: Colors.white,
                     ),
+                    label: '12.8k',
                   ),
                   const SizedBox(height: 18),
-                  const Icon(Icons.share_outlined, color: Colors.white),
+                  _PlayerActionButton(
+                    tooltip: strings.shareDrama,
+                    onPressed: () => showShareSheet(strings, tokens),
+                    icon: const Icon(Icons.share_outlined),
+                    label: 'Share',
+                  ),
                   const SizedBox(height: 18),
-                  const Icon(Icons.list_alt, color: Colors.white),
+                  _PlayerActionButton(
+                    tooltip: strings.episodeList,
+                    onPressed: readyEpisodes.isEmpty
+                        ? null
+                        : () => showEpisodeList(strings, tokens),
+                    icon: const Icon(Icons.list_alt),
+                    label: '${readyEpisodes.length}',
+                  ),
                   const SizedBox(height: 18),
                   Text(
                     tokens.name == 'Vertical Pulse'
@@ -256,7 +436,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   if (error != null) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '$error',
+                      playbackErrorMessage(strings, error),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
@@ -268,6 +448,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            backgroundColor:
+                                Colors.black.withValues(alpha: 0.18),
+                          ),
                           onPressed:
                               canGoPrevious ? () => switchEpisode(-1) : null,
                           icon: const Icon(Icons.skip_previous_outlined),
@@ -277,6 +465,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            backgroundColor:
+                                Colors.black.withValues(alpha: 0.18),
+                          ),
                           onPressed: canGoNext ? () => switchEpisode(1) : null,
                           icon: const Icon(Icons.skip_next_outlined),
                           label: Text(strings.nextEpisode),
@@ -307,6 +503,142 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ),
     );
   }
+}
+
+class _PreAuthorizationVideoOverlay extends StatelessWidget {
+  const _PreAuthorizationVideoOverlay({
+    required this.tokens,
+    required this.dramaTitle,
+    required this.episodeTitle,
+  });
+
+  final TemplateTokens tokens;
+  final String dramaTitle;
+  final String episodeTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.34),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+            ),
+            child: const Icon(
+              Icons.play_arrow_rounded,
+              color: Colors.white,
+              size: 56,
+            ),
+          ),
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.32),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '${tokens.playerModeLabel} · $episodeTitle',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            dramaTitle,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerActionButton extends StatelessWidget {
+  const _PlayerActionButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Widget icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        IconButton.filled(
+          tooltip: tooltip,
+          onPressed: onPressed,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.black.withValues(alpha: 0.34),
+            foregroundColor: Colors.white,
+          ),
+          icon: icon,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String playbackErrorMessage(AppStrings strings, Object? error) {
+  if (error is AppApiException) {
+    return switch (error.code) {
+      'APP_INSUFFICIENT_BALANCE' => strings.insufficientBalance,
+      'APP_EPISODE_NOT_READY' => strings.episodeNotReady,
+      'APP_NOT_FOUND' ||
+      'APP_DRAMA_NOT_AVAILABLE' ||
+      'APP_FEATURE_DISABLED' =>
+        strings.notAuthorized,
+      'APP_PLAYBACK_TOKEN_FAILED' => strings.playbackTokenFailed,
+      _ => strings.serviceMaintenance,
+    };
+  }
+  return strings.serviceMaintenance;
+}
+
+bool playbackTokenNeedsRefresh(
+  PlayAuthorization authorization, {
+  DateTime? now,
+  Duration refreshBefore = const Duration(seconds: 30),
+}) {
+  final expiresAt = DateTime.tryParse(authorization.tokenExpiresAt);
+  if (expiresAt == null) {
+    return true;
+  }
+  final threshold = (now ?? DateTime.now().toUtc()).add(refreshBefore);
+  return !expiresAt.toUtc().isAfter(threshold);
 }
 
 class _AuthorizedVideoView extends StatefulWidget {

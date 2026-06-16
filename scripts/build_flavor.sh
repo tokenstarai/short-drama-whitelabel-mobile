@@ -67,10 +67,10 @@ if [[ "$platform" == "android" ]]; then
 fi
 
 case "$flavor" in
-  hongguo|douyin|hippo|reelshort) ;;
+  coolshow|hongguo|douyin|hippo|reelshort) ;;
   *)
     echo "Unknown flavor: $flavor" >&2
-    echo "Use one of: hongguo, douyin, hippo, reelshort" >&2
+    echo "Use one of: coolshow, hongguo, douyin, hippo, reelshort" >&2
     exit 2
     ;;
 esac
@@ -88,14 +88,14 @@ case "$platform" in
   android)
     case "$package_type" in
       apk)
-        (cd "$mobile_dir" && "$flutter_bin" build apk "--$mode" --flavor "$flavor" --dart-define="APP_FLAVOR=$flavor")
+        (cd "$mobile_dir" && "$flutter_bin" --no-version-check build apk "--$mode" --flavor "$flavor" --dart-define="APP_FLAVOR=$flavor")
         ;;
       appbundle|aab)
         if [[ "$mode" == "debug" ]]; then
           echo "Android app bundles are only supported for profile/release builds." >&2
           exit 2
         fi
-        (cd "$mobile_dir" && "$flutter_bin" build appbundle "--$mode" --flavor "$flavor" --dart-define="APP_FLAVOR=$flavor")
+        (cd "$mobile_dir" && "$flutter_bin" --no-version-check build appbundle "--$mode" --flavor "$flavor" --dart-define="APP_FLAVOR=$flavor")
         ;;
       *)
         echo "Unknown Android package type: $package_type" >&2
@@ -112,6 +112,7 @@ case "$platform" in
     require_ios_toolchain
     ios_config="$mobile_dir/ios/Flutter/WhitelabelDefaults.xcconfig"
     case "$flavor" in
+      coolshow) source_config="$mobile_dir/ios/Flutter/Coolshow.xcconfig" ;;
       hongguo) source_config="$mobile_dir/ios/Flutter/Hongguo.xcconfig" ;;
       douyin) source_config="$mobile_dir/ios/Flutter/Douyin.xcconfig" ;;
       hippo) source_config="$mobile_dir/ios/Flutter/Hippo.xcconfig" ;;
@@ -129,7 +130,7 @@ case "$platform" in
     }
     trap restore EXIT
     cp "$source_config" "$ios_config"
-    (cd "$mobile_dir" && "$flutter_bin" build ios "--$mode" --no-codesign --dart-define="APP_FLAVOR=$flavor")
+    (cd "$mobile_dir" && "$flutter_bin" --no-version-check build ios "--$mode" --no-codesign --dart-define="APP_FLAVOR=$flavor")
     ;;
   *)
     echo "Unknown platform: $platform" >&2

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ const prototypeWidths = <double>[360, 390, 430, 768];
 const prototypeHeight = 844.0;
 
 final prototypeFlavors = <String, FlavorConfig Function()>{
+  'coolshow': FlavorConfig.coolshow,
   'hongguo': FlavorConfig.hongguo,
   'douyin': FlavorConfig.douyin,
   'hippo': FlavorConfig.hippo,
@@ -56,7 +58,10 @@ final prototypeScreens = <PrototypeScreen>[
   PrototypeScreen(
     id: '02_auth',
     label: 'Login / Register',
-    build: (flavor) => AuthScreen(flavor: flavor),
+    build: (flavor) => AuthScreen(
+      flavor: flavor,
+      callbackLinks: PrototypeOAuthCallbackLinks(),
+    ),
   ),
   PrototypeScreen(
     id: '03_home',
@@ -85,7 +90,7 @@ final prototypeScreens = <PrototypeScreen>[
       flavor: flavor,
       dramaId: 'drama_1',
       episodeId: 'episode_1',
-      dramaTitle: 'Midnight Contract',
+      dramaTitle: 'Contract Wife',
       episodeTitle: 'Episode 1',
     ),
   ),
@@ -119,6 +124,14 @@ class PrototypeScreen {
   final Future<void> Function(WidgetTester tester)? afterPump;
 }
 
+class PrototypeOAuthCallbackLinks implements OAuthCallbackLinks {
+  @override
+  Future<Uri?> getInitialLink() async => null;
+
+  @override
+  Stream<Uri> get uriLinkStream => const Stream.empty();
+}
+
 class PrototypeTransport implements AdapterTransport {
   @override
   Future<AdapterResponse> send(AdapterRequest request) async {
@@ -132,7 +145,7 @@ class PrototypeTransport implements AdapterTransport {
         'status': 'ok',
         'drama': {
           'dramaId': 'drama_1',
-          'title': 'Midnight Contract',
+          'title': 'Contract Wife',
           'posterUrl': '/assets/posters/midnight.png',
           'episodeCount': 36,
           'readyEpisodeCount': 8,
@@ -262,6 +275,7 @@ Future<void> pumpPrototypeScreen(
 
   final runtime = AppRuntime(
     flavor: flavor,
+    localeCode: 'en-US',
     client: TenantAdapterClient(
       baseUri: Uri.parse('https://tenant-edge.example.test'),
       transport: PrototypeTransport(),

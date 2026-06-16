@@ -11,6 +11,7 @@ json_escape() {
 
 flavor_template() {
   case "$1" in
+    coolshow) echo "coolshow" ;;
     hongguo) echo "hongguo_inspired" ;;
     douyin) echo "douyin_inspired" ;;
     hippo) echo "hippo_inspired" ;;
@@ -21,6 +22,7 @@ flavor_template() {
 
 flavor_app_name() {
   case "$1" in
+    coolshow) echo "CoolShow Short" ;;
     hongguo) echo "GoldFruit Drama" ;;
     douyin) echo "Pulse Drama" ;;
     hippo) echo "River Drama" ;;
@@ -31,6 +33,7 @@ flavor_app_name() {
 
 flavor_application_id() {
   case "$1" in
+    coolshow) echo "com.coolshow.short" ;;
     hongguo) echo "com.shortdrama.goldfruit" ;;
     douyin) echo "com.shortdrama.pulse" ;;
     hippo) echo "com.shortdrama.river" ;;
@@ -41,6 +44,7 @@ flavor_application_id() {
 
 flavor_deep_link_scheme() {
   case "$1" in
+    coolshow) echo "coolshowshort" ;;
     hongguo) echo "goldfruitdrama" ;;
     douyin) echo "pulsedrama" ;;
     hippo) echo "riverdrama" ;;

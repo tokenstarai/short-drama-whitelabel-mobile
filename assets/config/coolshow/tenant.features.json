@@ -1,0 +1,7 @@
+{
+  "enableCardRedeem": true,
+  "enableOfflineTopup": true,
+  "enableOnlinePayment": true,
+  "enableAdsUnlock": true,
+  "enableAccountDeletion": true
+}

@@ -89,12 +89,15 @@ iOS uses the generated `Runner` project plus flavor xcconfig presets:
 - `ios/Flutter/Douyin.xcconfig`
 - `ios/Flutter/Hippo.xcconfig`
 - `ios/Flutter/Reelshort.xcconfig`
+- `ios/Flutter/Coolshow.xcconfig`
 
-The shared Xcode schemes are `hongguo`, `douyin`, `hippo`, and `reelshort`.
+The shared Xcode schemes are `coolshow`, `hongguo`, `douyin`, `hippo`, and `reelshort`.
 Each scheme selects the matching xcconfig before build, and each flavor
 xcconfig carries the public `APP_FLAVOR` Dart define used by Flutter runtime
-selection. `ios/Flutter/WhitelabelDefaults.xcconfig` keeps `hongguo` as the
-default for generic Runner builds.
+selection. `ios/Flutter/WhitelabelDefaults.xcconfig` keeps the local default
+used by generic Runner builds. Focused build scripts such as
+`scripts/build_coolshow_ios_test.sh` copy the selected flavor xcconfig into that
+default before building and restore the previous file at script exit.
 
 Native defaults included in this repo:
 

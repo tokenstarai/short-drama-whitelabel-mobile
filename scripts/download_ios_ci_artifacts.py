@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE_DIR = ROOT / "build" / "ci-ios"
 DEFAULT_IMPORT_OUTPUT = ROOT / "build" / "ios-ci-evidence" / "ios-ci-artifacts.json"
 DEFAULT_WORKFLOW = "mobile-flutter.yml"
-FLAVOR_ORDER = ["hongguo", "douyin", "hippo", "reelshort"]
+FLAVOR_ORDER = ["coolshow", "hongguo", "douyin", "hippo", "reelshort"]
 
 
 def utc_now() -> str:

@@ -18,6 +18,11 @@ DEFAULT_OUTPUT = ROOT / "build" / "ios-ci-evidence" / "ios-ci-artifacts.json"
 DEFAULT_INFO_DIR = ROOT / "build" / "ios-ci-evidence" / "app-info"
 
 FLAVORS = {
+    "coolshow": {
+        "applicationId": "com.coolshow.short",
+        "appName": "CoolShow Short",
+        "artifactName": "mobile-coolshow-ios-unsigned",
+    },
     "hongguo": {
         "applicationId": "com.shortdrama.goldfruit",
         "appName": "GoldFruit Drama",

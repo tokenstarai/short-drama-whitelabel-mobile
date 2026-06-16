@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_runtime.dart';
+import '../../core/api/app_models.dart';
 import '../../flavor/flavor.dart';
 import '../../theme/template_theme.dart';
+import '../drama_detail/drama_detail_screen.dart';
+import '../player/player_screen.dart';
 
 enum LibraryScreenMode { watchHistory, favorites }
 
@@ -32,16 +35,17 @@ class LibraryScreen extends StatelessWidget {
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: mode == LibraryScreenMode.watchHistory
-            ? _WatchHistoryList(tokens: tokens)
-            : _FavoritesList(tokens: tokens),
+            ? _WatchHistoryList(flavor: flavor, tokens: tokens)
+            : _FavoritesList(flavor: flavor, tokens: tokens),
       ),
     );
   }
 }
 
 class _WatchHistoryList extends StatelessWidget {
-  const _WatchHistoryList({required this.tokens});
+  const _WatchHistoryList({required this.flavor, required this.tokens});
 
+  final FlavorConfig flavor;
   final TemplateTokens tokens;
 
   @override
@@ -68,6 +72,27 @@ class _WatchHistoryList extends StatelessWidget {
             title: Text(entry.dramaTitle),
             subtitle: Text(entry.episodeTitle),
             trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PlayerScreen(
+                  flavor: flavor,
+                  dramaId: entry.dramaId,
+                  episodeId: entry.episodeId,
+                  dramaTitle: entry.dramaTitle,
+                  episodeTitle: entry.episodeTitle,
+                  episodes: [
+                    DramaEpisode(
+                      episodeId: entry.episodeId,
+                      episodeNumber: 1,
+                      title: entry.episodeTitle,
+                      pointPrice: 0,
+                      ready: true,
+                      locked: false,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         );
       },
@@ -76,8 +101,9 @@ class _WatchHistoryList extends StatelessWidget {
 }
 
 class _FavoritesList extends StatelessWidget {
-  const _FavoritesList({required this.tokens});
+  const _FavoritesList({required this.flavor, required this.tokens});
 
+  final FlavorConfig flavor;
   final TemplateTokens tokens;
 
   @override
@@ -104,11 +130,39 @@ class _FavoritesList extends StatelessWidget {
             title: Text(favorite.title),
             subtitle: Text(favorite.dramaId),
             trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => DramaDetailScreen(
+                  flavor: flavor,
+                  dramaId: favorite.dramaId,
+                  drama: _catalogDramaForFavorite(runtime, favorite),
+                ),
+              ),
+            ),
           ),
         );
       },
     );
   }
+}
+
+CatalogDrama _catalogDramaForFavorite(
+  AppRuntime runtime,
+  FavoriteDrama favorite,
+) {
+  for (final drama in runtime.catalog) {
+    if (drama.dramaId == favorite.dramaId) {
+      return drama;
+    }
+  }
+  return CatalogDrama(
+    dramaId: favorite.dramaId,
+    title: favorite.title,
+    posterUrl: '',
+    episodeCount: 1,
+    readyEpisodeCount: 1,
+    pointPrice: 0,
+  );
 }
 
 class _EmptyLibraryState extends StatelessWidget {

@@ -18,6 +18,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
 
 flutter:
@@ -26,7 +28,9 @@ flutter:
     - assets/config/golden/
     - assets/config/purple/
     - assets/config/blue/
+    - assets/config/coolshow/
     - assets/config/hongguo/
     - assets/config/douyin/
     - assets/config/hippo/
     - assets/config/reelshort/
+    - assets/visuals/

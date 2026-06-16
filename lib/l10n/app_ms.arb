@@ -14,10 +14,14 @@
   "playbackTokenFailed": "Kebenaran main balik gagal. Sila cuba lagi.",
   "cardRedeem": "Tebus Kad",
   "onlinePayment": "Tambah Nilai Dalam Talian",
+  "paymentFailed": "Pembayaran gagal. Pilih kaedah lain atau cuba lagi.",
   "accountDelete": "Padam Akaun",
+  "authFailed": "Log masuk gagal. Cuba lagi atau pilih kaedah lain.",
   "settings": "Tetapan",
   "language": "Bahasa",
   "pointCardManagement": "Pengurusan Kad Mata",
   "noPointCardRecords": "Tiada rekod kad mata lagi",
+  "pointCardRedeemFailed": "Kad mata ini tidak boleh digunakan. Semak dan cuba lagi.",
+  "pointCardRedeemUnavailable": "Tambah nilai kad mata tidak tersedia dalam binaan ini.",
   "consumerWallet": "dompet pengguna"
 }

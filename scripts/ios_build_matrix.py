@@ -21,6 +21,10 @@ DEFAULT_OUTPUT = ROOT / "build" / "ios-build-matrix" / "ios-build-matrix.json"
 DEFAULT_INFO_DIR = ROOT / "build" / "ios-build-matrix" / "app-info"
 
 FLAVORS = {
+    "coolshow": {
+        "applicationId": "com.coolshow.short",
+        "appName": "CoolShow Short",
+    },
     "hongguo": {
         "applicationId": "com.shortdrama.goldfruit",
         "appName": "GoldFruit Drama",

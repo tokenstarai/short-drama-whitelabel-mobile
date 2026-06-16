@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_runtime.dart';
+import '../../core/api/app_models.dart';
 import '../../core/config/app_capabilities.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../flavor/flavor.dart';
 import '../../theme/template_theme.dart';
 
@@ -114,7 +116,10 @@ class _AuthScreenState extends State<AuthScreen> {
     }).catchError((Object error) {
       if (mounted) {
         setState(() {
-          errorText = '$error';
+          errorText = authErrorMessage(
+            AppRuntimeScope.of(context).strings,
+            error,
+          );
         });
       }
     });
@@ -124,13 +129,23 @@ class _AuthScreenState extends State<AuthScreen> {
         onError: (Object error) {
           if (mounted) {
             setState(() {
-              errorText = '$error';
+              errorText = authErrorMessage(
+                AppRuntimeScope.of(context).strings,
+                error,
+              );
             });
           }
         },
       );
     } catch (error) {
-      errorText = '$error';
+      if (mounted) {
+        setState(() {
+          errorText = authErrorMessage(
+            AppRuntimeScope.of(context).strings,
+            error,
+          );
+        });
+      }
     }
   }
 
@@ -165,6 +180,26 @@ class _AuthScreenState extends State<AuthScreen> {
           provider: provider.wireValue,
           endUserRef: runtime.endUserRef,
         );
+        if (runtime.isDemoMode) {
+          final completed = await runtime.client.completeOAuth(
+            provider: result.provider,
+            oauthStartId: result.oauthStartId,
+            code: 'demo-oauth-code',
+            state: 'demo',
+            endUserRef: runtime.endUserRef,
+          );
+          runtime.applyAuthenticatedAccount(completed.account);
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            oauthProvider = result.provider;
+            oauthStartId = result.oauthStartId;
+            resultText =
+                '${completed.provider} demo sign-in completed for ${completed.account.accountRefMasked}.';
+          });
+          return;
+        }
         final authUri = Uri.tryParse(result.authUrl);
         if (authUri == null || !authUri.hasScheme) {
           throw StateError('Tenant OAuth URL is unavailable.');
@@ -188,7 +223,7 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
       setState(() {
-        errorText = '$error';
+        errorText = authErrorMessage(runtime.strings, error);
       });
     } finally {
       if (mounted) {
@@ -231,7 +266,7 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
       setState(() {
-        errorText = '$error';
+        errorText = authErrorMessage(runtime.strings, error);
       });
     } finally {
       if (mounted) {
@@ -281,7 +316,7 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
       setState(() {
-        errorText = '$error';
+        errorText = authErrorMessage(runtime.strings, error);
       });
     } finally {
       if (mounted) {
@@ -293,7 +328,8 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _ensureAuthProviderEnabled(AppRuntime runtime, String provider) {
-    final enabledProviders = runtime.effectiveCapabilities.normalizedAuthProviders
+    final enabledProviders = runtime
+        .effectiveCapabilities.normalizedAuthProviders
         .map((item) => item.wireValue)
         .toSet();
     if (!enabledProviders.contains(provider)) {
@@ -354,6 +390,26 @@ class _AuthScreenState extends State<AuthScreen> {
       capabilities.styleTemplate,
       runtime.effectiveBrandPrimaryColor,
     );
+    if (tokens.name == 'CoolShow Short') {
+      return _CoolShowAuthScaffold(
+        appName: runtime.appName,
+        tokens: tokens,
+        capabilities: capabilities,
+        emailController: emailController,
+        emailCodeController: emailCodeController,
+        oauthCodeController: oauthCodeController,
+        oauthStateController: oauthStateController,
+        emailChallengeId: emailChallengeId,
+        oauthStartId: oauthStartId,
+        oauthProvider: oauthProvider,
+        submitting: submitting,
+        resultText: resultText,
+        errorText: errorText,
+        onStartProvider: startProvider,
+        onVerifyEmail: verifyEmailChallenge,
+        onCompleteOAuth: completeOAuthSignIn,
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Login / Register')),
       body: ListView(
@@ -468,4 +524,437 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
     );
   }
+}
+
+class _CoolShowAuthScaffold extends StatelessWidget {
+  const _CoolShowAuthScaffold({
+    required this.appName,
+    required this.tokens,
+    required this.capabilities,
+    required this.emailController,
+    required this.emailCodeController,
+    required this.oauthCodeController,
+    required this.oauthStateController,
+    required this.submitting,
+    required this.onStartProvider,
+    required this.onVerifyEmail,
+    required this.onCompleteOAuth,
+    this.emailChallengeId,
+    this.oauthStartId,
+    this.oauthProvider,
+    this.resultText,
+    this.errorText,
+  });
+
+  final String appName;
+  final TemplateTokens tokens;
+  final AppCapabilities capabilities;
+  final TextEditingController emailController;
+  final TextEditingController emailCodeController;
+  final TextEditingController oauthCodeController;
+  final TextEditingController oauthStateController;
+  final bool submitting;
+  final String? emailChallengeId;
+  final String? oauthStartId;
+  final String? oauthProvider;
+  final String? resultText;
+  final String? errorText;
+  final Future<void> Function(AuthProvider provider) onStartProvider;
+  final Future<void> Function() onVerifyEmail;
+  final Future<void> Function({OAuthCallbackPayload? callback}) onCompleteOAuth;
+
+  @override
+  Widget build(BuildContext context) {
+    final providers = capabilities.normalizedAuthProviders;
+    return Scaffold(
+      backgroundColor: tokens.background,
+      body: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            SizedBox(
+              height: 272,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/visuals/scene_01.jpg',
+                    fit: BoxFit.cover,
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x9906070A),
+                          Color(0x2206070A),
+                          Color(0xFF06070A),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 18,
+                    right: 18,
+                    top: 18,
+                    child: Row(
+                      children: [
+                        const _CoolShowMark(size: 28),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            appName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {},
+                          icon: const Icon(
+                            Icons.language_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Positioned(
+                    left: 18,
+                    right: 18,
+                    bottom: 22,
+                    child: Text(
+                      'Continue the next episode',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 27,
+                        height: 1.02,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF141820),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66000000),
+                    blurRadius: 32,
+                    offset: Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Sign in to sync history, unlocks, and language.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (providers.contains(AuthProvider.email)) ...[
+                    _CoolShowTextField(
+                      controller: emailController,
+                      label: 'Email',
+                      icon: Icons.mail_outline_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 10),
+                    const _CoolShowReadonlyField(
+                      label: 'Password',
+                      value: 'Email code or tenant OAuth',
+                      icon: Icons.lock_outline_rounded,
+                    ),
+                    const SizedBox(height: 12),
+                    _CoolShowPrimaryButton(
+                      label: 'Sign in with Email',
+                      icon: Icons.mail_outline_rounded,
+                      tokens: tokens,
+                      onPressed: submitting
+                          ? null
+                          : () => onStartProvider(AuthProvider.email),
+                    ),
+                  ],
+                  if (emailChallengeId != null) ...[
+                    const SizedBox(height: 10),
+                    _CoolShowTextField(
+                      controller: emailCodeController,
+                      label: 'Email verification code',
+                      icon: Icons.verified_outlined,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 10),
+                    _CoolShowPrimaryButton(
+                      label: 'Verify email',
+                      icon: Icons.verified_rounded,
+                      tokens: tokens,
+                      onPressed: submitting ? null : onVerifyEmail,
+                    ),
+                  ],
+                  for (final provider in providers)
+                    if (provider != AuthProvider.email)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: _CoolShowProviderButton(
+                          provider: provider,
+                          submitting: submitting,
+                          onPressed: () => onStartProvider(provider),
+                        ),
+                      ),
+                  if (oauthStartId != null) ...[
+                    const SizedBox(height: 10),
+                    _CoolShowTextField(
+                      controller: oauthCodeController,
+                      label: 'OAuth callback code',
+                      icon: Icons.key_rounded,
+                    ),
+                    const SizedBox(height: 10),
+                    _CoolShowTextField(
+                      controller: oauthStateController,
+                      label: 'OAuth callback state',
+                      icon: Icons.shield_outlined,
+                    ),
+                    const SizedBox(height: 10),
+                    _CoolShowPrimaryButton(
+                      label: 'Complete ${oauthProvider ?? 'social'} sign-in',
+                      icon: Icons.verified_user_outlined,
+                      tokens: tokens,
+                      onPressed: submitting ? null : () => onCompleteOAuth(),
+                    ),
+                  ],
+                  if (resultText != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      resultText!,
+                      style: TextStyle(
+                        color: tokens.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                  if (errorText != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      errorText!,
+                      style: const TextStyle(
+                        color: Color(0xFFFF6161),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: const Text('Continue as guest'),
+                  ),
+                  Text(
+                    'By continuing, you agree to Terms and Privacy Policy.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.42),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoolShowMark extends StatelessWidget {
+  const _CoolShowMark({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/visuals/coolshow-mark.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => Icon(
+        Icons.play_arrow_rounded,
+        color: Colors.white,
+        size: size,
+      ),
+    );
+  }
+}
+
+class _CoolShowTextField extends StatelessWidget {
+  const _CoolShowTextField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.keyboardType,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: Colors.white70),
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.07),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFFFB23F)),
+        ),
+      ),
+    );
+  }
+}
+
+class _CoolShowReadonlyField extends StatelessWidget {
+  const _CoolShowReadonlyField({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white70),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoolShowPrimaryButton extends StatelessWidget {
+  const _CoolShowPrimaryButton({
+    required this.label,
+    required this.icon,
+    required this.tokens,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final TemplateTokens tokens;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      style: FilledButton.styleFrom(
+        backgroundColor: tokens.primary,
+        foregroundColor: const Color(0xFF171008),
+        minimumSize: const Size.fromHeight(48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
+class _CoolShowProviderButton extends StatelessWidget {
+  const _CoolShowProviderButton({
+    required this.provider,
+    required this.submitting,
+    required this.onPressed,
+  });
+
+  final AuthProvider provider;
+  final bool submitting;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final providerName = provider.wireValue;
+    final isApple = provider == AuthProvider.apple;
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(46),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+        backgroundColor:
+            isApple ? Colors.white.withValues(alpha: 0.13) : Colors.white10,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      onPressed: submitting ? null : onPressed,
+      icon: Icon(isApple ? Icons.apple : Icons.login_outlined),
+      label: Text(
+        'Continue with $providerName',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+String authErrorMessage(AppStrings strings, Object? error) {
+  if (error is AppApiException) {
+    return strings.authFailed;
+  }
+  return '$error';
 }

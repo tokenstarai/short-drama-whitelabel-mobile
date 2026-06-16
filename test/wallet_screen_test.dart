@@ -122,6 +122,28 @@ class WalletFakeTransport implements AdapterTransport {
   }
 }
 
+class WalletPaymentErrorTransport extends WalletFakeTransport {
+  @override
+  Future<AdapterResponse> send(AdapterRequest request) async {
+    requests.add(request);
+    if (request.path == '/payment/intents') {
+      return const AdapterResponse(
+        statusCode: 403,
+        body: '''
+          {
+            "error": {
+              "code": "APP_PAYMENT_PROVIDER_DISABLED",
+              "message": "Provider stripe is disabled for this tenant.",
+              "requestId": "req_pay_raw"
+            }
+          }
+        ''',
+      );
+    }
+    return super.send(request);
+  }
+}
+
 AdapterResponse _ok(Map<String, dynamic> body, {int statusCode = 200}) {
   return AdapterResponse(statusCode: statusCode, body: jsonEncode(body));
 }
@@ -160,14 +182,29 @@ void main() {
 
     await tester.tap(find.text('BCA Bank'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('bank transfer'), 240);
-    await tester.tap(find.text('bank transfer'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Transfer proof reference'),
+      '  receipt-2026-06-14-bca  ',
+    );
+    await tester.pumpAndSettle();
+    final bankTransferTile =
+        find.byKey(const ValueKey('payment-provider-bank_transfer'));
+    await tester.scrollUntilVisible(
+      bankTransferTile,
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(bankTransferTile);
     await tester.pumpAndSettle();
 
     final offlineRequest = transport.requests.singleWhere(
       (request) => request.path == '/payment/offline-applications',
     );
     expect(offlineRequest.body?['paymentChannelId'], 'payment_bca');
+    expect(
+      offlineRequest.body?['proofR2Key'],
+      'receipt-2026-06-14-bca',
+    );
     expect(
         offlineRequest.body?['requestedBy'], 'anon:pulsedrama-wallet-widget');
     expect(find.textContaining('consumer_topup_widget'), findsOneWidget);
@@ -205,8 +242,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('stripe'), 240);
-    await tester.tap(find.text('stripe'));
+    final stripeTile = find.byKey(const ValueKey('payment-provider-stripe'));
+    await tester.scrollUntilVisible(
+      stripeTile,
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(stripeTile);
     await tester.pumpAndSettle();
 
     final intentRequest = transport.requests.singleWhere(
@@ -269,7 +311,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Payment entry gated by store compliance'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Payment entry gated by store compliance'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+        find.text('Payment entry gated by store compliance'), findsOneWidget);
     expect(find.text('stripe'), findsNothing);
     expect(find.text('paypal'), findsNothing);
     expect(find.text('bank transfer'), findsNothing);
@@ -375,5 +423,48 @@ void main() {
     );
     expect(verifyRequest.body?['endUserRef'], 'anon:goldfruit-store-widget');
     expect(find.textContaining('store purchase verified'), findsOneWidget);
+  });
+
+  testWidgets('wallet maps payment errors to friendly text', (
+    tester,
+  ) async {
+    final flavor = FlavorConfig.douyin();
+    final transport = WalletPaymentErrorTransport();
+    final runtime = AppRuntime(
+      flavor: flavor,
+      endUserRef: 'anon:pulsedrama-payment-error',
+      client: TenantAdapterClient(
+        baseUri: Uri.parse('https://tenant-edge.example.test'),
+        transport: transport,
+      ),
+    );
+    addTearDown(runtime.dispose);
+
+    await tester.pumpWidget(
+      AppRuntimeScope(
+        runtime: runtime,
+        child: MaterialApp(home: WalletScreen(flavor: flavor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final stripeTile = find.byKey(const ValueKey('payment-provider-stripe'));
+    await tester.scrollUntilVisible(
+      stripeTile,
+      360,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(stripeTile);
+    await tester.pumpAndSettle();
+    await tester.tapAt(tester.getCenter(stripeTile));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Payment failed. Please choose another method or retry.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('APP_PAYMENT_PROVIDER_DISABLED'), findsNothing);
+    expect(find.textContaining('req_pay_raw'), findsNothing);
+    expect(find.textContaining('Provider stripe is disabled'), findsNothing);
   });
 }

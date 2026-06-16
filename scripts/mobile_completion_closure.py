@@ -67,22 +67,78 @@ def next_action(check_id: str, check: dict[str, Any]) -> str:
     if check_id == "ios_ci_artifact_evidence":
         return "Run scripts/mobile_completion_closure.py after a successful mobile-flutter.yml Actions run; set --repo <owner/repo> if GH_REPO, GITHUB_REPOSITORY, or git origin cannot identify the repository."
     if check_id == "store_submission_evidence":
-        return "Copy build/store-submission-evidence/store-submission-evidence.template.json to store-submission-evidence.input.json, fill public TestFlight/Play/direct status fields for every flavor, then rerun scripts/import_store_submission_evidence.py --strict."
+        return "Open build/store-submission-starter/store-submission-operator-runbook.md, save each tenant-filled flavor file under build/store-submission-evidence/flavors/<flavor>.input.json or merge all submissions into build/store-submission-evidence/store-submission-evidence.input.json, then rerun scripts/import_store_submission_evidence.py --source-dir build/store-submission-evidence/flavors --strict."
     return f"Resolve {check_id}: {check.get('detail', 'no detail')}"
 
 
-def blocker_summary(audit: dict[str, Any]) -> list[dict[str, Any]]:
+def store_submission_remediation_hints(root: Path = ROOT) -> list[dict[str, Any]]:
+    preflight_path = root / "build" / "store-submission-evidence" / "store-submission-evidence-preflight.json"
+    if not preflight_path.exists():
+        return []
+    try:
+        preflight = read_json(preflight_path)
+    except (json.JSONDecodeError, OSError):
+        return []
+    hints: list[dict[str, Any]] = []
+    for row in preflight.get("flavors", []):
+        if not isinstance(row, dict):
+            continue
+        remediation = row.get("remediationHints")
+        if not isinstance(remediation, list) or not remediation:
+            continue
+        hints.append({
+            "flavor": row.get("flavor"),
+            "blockers": row.get("blockers", []),
+            "hints": remediation,
+            "tenantEvidenceInputPath": row.get("tenantEvidenceInputPath"),
+        })
+    return hints
+
+
+def blocker_summary(audit: dict[str, Any], *, root: Path = ROOT) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     for check_id, check in checks_by_id(audit).items():
         if check.get("status") != "blocked":
             continue
-        blockers.append({
+        if check.get("completionBlocking") is False:
+            continue
+        evidence = list(check.get("evidence", []))
+        if check_id == "store_submission_evidence":
+            for path in [
+                "build/store-submission-starter/store-submission-operator-runbook.md",
+                "build/store-submission-starter/store-submission-starter-manifest.json",
+                "build/store-submission-evidence/store-submission-evidence-preflight.json",
+                "build/store-submission-evidence/store-submission-evidence-preflight.md",
+            ]:
+                if path not in evidence:
+                    evidence.append(path)
+        blocker = {
             "id": check_id,
             "detail": check.get("detail"),
-            "evidence": check.get("evidence", []),
+            "evidence": evidence,
             "nextAction": next_action(check_id, check),
-        })
+        }
+        if check_id == "store_submission_evidence":
+            blocker["remediationHints"] = store_submission_remediation_hints(root)
+        blockers.append(blocker)
     return blockers
+
+
+def store_submission_starter_refresh_command() -> list[str]:
+    return ["python3", "scripts/export_store_submission_starter.py"]
+
+
+def store_submission_preflight_command() -> list[str]:
+    return ["python3", "scripts/store_submission_evidence_preflight.py"]
+
+
+def store_submission_import_command(args: argparse.Namespace) -> list[str]:
+    command = ["python3", "scripts/import_store_submission_evidence.py"]
+    if args.store_submission_source:
+        command.extend(["--source", str(args.store_submission_source.resolve())])
+    source_dir = args.store_submission_source_dir or Path("build/store-submission-evidence/flavors")
+    command.extend(["--source-dir", str(source_dir)])
+    return command
 
 
 def write_markdown(report: dict[str, Any], path: Path) -> None:
@@ -112,13 +168,21 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                 f"- Next action: {blocker['nextAction']}",
                 "",
             ])
+            remediation = blocker.get("remediationHints", [])
+            if remediation:
+                lines.append("#### Remediation Hints")
+                for item in remediation:
+                    lines.append(f"- `{item.get('flavor')}`: {', '.join(item.get('blockers', [])) or '-'}")
+                    for hint in item.get("hints", []):
+                        lines.append(f"  - {hint}")
+                lines.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
-def build_report(steps: list[dict[str, Any]], audit: dict[str, Any]) -> dict[str, Any]:
+def build_report(steps: list[dict[str, Any]], audit: dict[str, Any], *, root: Path = ROOT) -> dict[str, Any]:
     summary = audit.get("summary", {})
-    blockers = blocker_summary(audit)
+    blockers = blocker_summary(audit, root=root)
     return {
         "schemaVersion": 1,
         "generatedAt": utc_now(),
@@ -157,6 +221,7 @@ def main() -> int:
     parser.add_argument("--branch", help="Branch filter when resolving latest successful GitHub Actions run.")
     parser.add_argument("--skip-ios-ci-download", action="store_true")
     parser.add_argument("--store-submission-source", type=Path)
+    parser.add_argument("--store-submission-source-dir", type=Path)
     parser.add_argument("--output", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--markdown", type=Path, default=DEFAULT_MARKDOWN)
     parser.add_argument("--strict", action="store_true", help="Exit non-zero if completion is still blocked.")
@@ -167,10 +232,10 @@ def main() -> int:
     if command is not None:
         steps.append(run_step(command))
 
-    store_command = ["python3", "scripts/import_store_submission_evidence.py"]
-    if args.store_submission_source:
-        store_command.extend(["--source", str(args.store_submission_source.resolve())])
-    steps.append(run_step(store_command))
+    steps.append(run_step(store_submission_starter_refresh_command()))
+    steps.append(run_step(store_submission_preflight_command()))
+
+    steps.append(run_step(store_submission_import_command(args)))
     steps.append(run_step(["python3", "scripts/mobile_completion_audit.py"]))
 
     audit = read_json(AUDIT_PATH)
@@ -180,6 +245,32 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     write_markdown(report, markdown)
+
+    # Keep tenant-facing handoff archives aligned with the latest closure report.
+    try:
+        import mobile_completion_audit
+
+        tenant_release_path = mobile_completion_audit.write_tenant_release_package(ROOT)
+        steps.append({
+            "command": "refresh tenant release package after completion closure",
+            "cwd": str(ROOT),
+            "exitCode": 0,
+            "outputTail": [f"Refreshed {rel(tenant_release_path)}"],
+        })
+        report = build_report(steps, audit)
+        output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        write_markdown(report, markdown)
+        mobile_completion_audit.write_tenant_release_package(ROOT)
+    except Exception as error:  # pragma: no cover - defensive handoff refresh path
+        steps.append({
+            "command": "refresh tenant release package after completion closure",
+            "cwd": str(ROOT),
+            "exitCode": 1,
+            "outputTail": [str(error)],
+        })
+        report = build_report(steps, audit)
+        output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        write_markdown(report, markdown)
 
     print(f"Wrote completion closure report: {rel(output)}")
     print(f"Wrote completion closure markdown: {rel(markdown)}")

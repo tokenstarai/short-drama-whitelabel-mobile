@@ -1,0 +1,7 @@
+{
+  "styleTemplate": "coolshow",
+  "storeComplianceMode": "android_direct",
+  "authProviders": ["email", "google", "facebook", "apple"],
+  "consumerPaymentProviders": ["stripe", "paypal", "bank_transfer", "local_wallet", "crypto", "point_card"],
+  "consumerLedgerScope": "consumer"
+}

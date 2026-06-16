@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_runtime.dart';
 import '../../core/api/app_models.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../flavor/flavor.dart';
 import '../../theme/template_theme.dart';
 
@@ -112,12 +113,31 @@ class _CardRedeemScreenState extends State<CardRedeemScreen> {
           ],
           if (error != null) ...[
             const SizedBox(height: 16),
-            Text('$error', style: const TextStyle(color: Colors.redAccent)),
+            Text(
+              pointCardRedeemErrorMessage(runtime.strings, error),
+              style: const TextStyle(color: Colors.redAccent),
+            ),
           ],
         ],
       ),
     );
   }
+}
+
+String pointCardRedeemErrorMessage(AppStrings strings, Object? error) {
+  if (error is AppApiException) {
+    return switch (error.code) {
+      'APP_FEATURE_DISABLED' ||
+      'APP_PAYMENT_PROVIDER_DISABLED' =>
+        strings.pointCardRedeemUnavailable,
+      'APP_INVALID_REQUEST' ||
+      'APP_PAYMENT_PACKAGE_NOT_FOUND' ||
+      'RESOURCE_CONFLICT' =>
+        strings.pointCardRedeemFailed,
+      _ => strings.serviceMaintenance,
+    };
+  }
+  return strings.serviceMaintenance;
 }
 
 class _RedeemResult extends StatelessWidget {

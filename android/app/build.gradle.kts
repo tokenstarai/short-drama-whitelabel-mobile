@@ -25,6 +25,12 @@ android {
 
     flavorDimensions += "template"
     productFlavors {
+        create("coolshow") {
+            dimension = "template"
+            applicationId = "com.coolshow.short"
+            manifestPlaceholders["appName"] = "CoolShow Short"
+            manifestPlaceholders["deepLinkScheme"] = "coolshowshort"
+        }
         create("hongguo") {
             dimension = "template"
             applicationId = "com.shortdrama.goldfruit"

@@ -13,6 +13,7 @@ class AppRuntime extends ChangeNotifier {
     required this.client,
     String? endUserRef,
     String? localeCode,
+    this.isDemoMode = false,
   })  : endUserRef = endUserRef ?? _defaultEndUserRef(flavor),
         localeCode = _normalizeLocaleCode(
           localeCode ?? _firstSupportedLocale(flavor.brand.supportedLocales),
@@ -22,6 +23,7 @@ class AppRuntime extends ChangeNotifier {
   final FlavorConfig flavor;
   final TenantAdapterClient client;
   final String endUserRef;
+  final bool isDemoMode;
   String localeCode;
   AppRuntimeData data;
   bool loading = false;
@@ -40,8 +42,8 @@ class AppRuntime extends ChangeNotifier {
 
   AppCapabilities get effectiveCapabilities =>
       data.config?.capabilities.constrainedByNativeBuild(
-            flavor.capabilities,
-          ) ??
+        flavor.capabilities,
+      ) ??
       flavor.capabilities;
 
   AppLegalUrls get effectiveLegal =>
@@ -83,11 +85,10 @@ class AppRuntime extends ChangeNotifier {
   PaymentOptions? get paymentOptions => data.paymentOptions;
 
   List<ConsumerPaymentProvider> get effectivePaymentProviders {
-    Iterable<String> providerWireValues =
-        data.paymentOptions?.providers ??
-            effectiveCapabilities.visiblePaymentProviders.map(
-              (provider) => provider.wireValue,
-            );
+    Iterable<String> providerWireValues = data.paymentOptions?.providers ??
+        effectiveCapabilities.visiblePaymentProviders.map(
+          (provider) => provider.wireValue,
+        );
     final paymentOptions = data.paymentOptions;
     if (paymentOptions != null && !paymentOptions.externalPaymentsAllowed) {
       providerWireValues = providerWireValues.where(
@@ -266,6 +267,27 @@ class AppRuntime extends ChangeNotifier {
       config: data.config,
       catalog: data.catalog,
       account: account,
+      wallet: data.wallet,
+      walletLedger: data.walletLedger,
+      paymentOptions: data.paymentOptions,
+      topupPaymentChannels: data.topupPaymentChannels,
+    );
+    notifyListeners();
+  }
+
+  void signOut() {
+    data = AppRuntimeData(
+      config: data.config,
+      catalog: data.catalog,
+      account: UserAccount(
+        requestId: 'local_sign_out',
+        tenantId: data.account?.tenantId ?? data.wallet?.tenantId ?? '',
+        accountRefMasked: endUserRef,
+        authProviders: const [],
+        membershipTier: 'guest',
+        deletionEndpoint:
+            data.account?.deletionEndpoint ?? '/me/delete-request',
+      ),
       wallet: data.wallet,
       walletLedger: data.walletLedger,
       paymentOptions: data.paymentOptions,
@@ -499,19 +521,85 @@ class AppRuntimeData {
       catalog: const [
         CatalogDrama(
           dramaId: 'drama_1',
-          title: 'Seed Drama',
-          posterUrl: '/assets/posters/1.png',
-          episodeCount: 12,
-          readyEpisodeCount: 1,
-          pointPrice: 2,
+          title: 'Contract Wife',
+          summary:
+              'A fake marriage becomes a public fight for power, love, and revenge.',
+          posterUrl: 'assets/visuals/poster_01.jpg',
+          episodeCount: 68,
+          readyEpisodeCount: 24,
+          pointPrice: 30,
+          language: 'en-US',
+          regions: ['US', 'SG'],
+          tags: ['Romance', 'Revenge', 'Billionaire'],
+          categorySelections: {
+            'genre': ['romance', 'revenge'],
+            'market': ['US', 'SG'],
+          },
         ),
         CatalogDrama(
           dramaId: 'drama_2',
-          title: 'Midnight Contract',
-          posterUrl: '/assets/posters/2.png',
-          episodeCount: 36,
-          readyEpisodeCount: 8,
-          pointPrice: 2,
+          title: 'Heiress Returns',
+          summary:
+              'A missing heiress reclaims her name while enemies close in.',
+          posterUrl: 'assets/visuals/poster_02.jpg',
+          episodeCount: 60,
+          readyEpisodeCount: 12,
+          pointPrice: 30,
+          language: 'en-US',
+          regions: ['SG', 'MY'],
+          tags: ['Heiress', 'Revenge', 'Romance'],
+          categorySelections: {
+            'genre': ['heiress', 'revenge', 'romance'],
+            'market': ['SG', 'MY'],
+          },
+        ),
+        CatalogDrama(
+          dramaId: 'drama_3',
+          title: 'Island Heiress',
+          summary: 'She vanished from high society and returned with a secret.',
+          posterUrl: 'assets/visuals/poster_03.jpg',
+          episodeCount: 58,
+          readyEpisodeCount: 5,
+          pointPrice: 25,
+          language: 'en-US',
+          regions: ['PH', 'SG'],
+          tags: ['Island', 'Heiress', 'Romance'],
+          categorySelections: {
+            'genre': ['island', 'heiress', 'romance'],
+            'market': ['PH', 'SG'],
+          },
+        ),
+        CatalogDrama(
+          dramaId: 'drama_4',
+          title: "The CEO's Revenge",
+          summary: 'After betrayal, a powerful CEO returns in secret.',
+          posterUrl: 'assets/visuals/poster_04.jpg',
+          episodeCount: 72,
+          readyEpisodeCount: 9,
+          pointPrice: 35,
+          language: 'en-US',
+          regions: ['US', 'MY'],
+          tags: ['CEO', 'Suspense', 'Trending'],
+          categorySelections: {
+            'genre': ['ceo', 'suspense', 'trending'],
+            'market': ['US', 'MY'],
+          },
+        ),
+        CatalogDrama(
+          dramaId: 'drama_5',
+          title: 'Hidden Vow',
+          summary: 'The wedding was staged. The danger was real.',
+          posterUrl: 'assets/visuals/poster_05.jpg',
+          episodeCount: 46,
+          readyEpisodeCount: 1,
+          pointPrice: 20,
+          language: 'en-US',
+          regions: ['MY', 'ID'],
+          tags: ['Wedding', 'Family', 'Secret'],
+          categorySelections: {
+            'genre': ['wedding', 'family', 'secret'],
+            'market': ['MY', 'ID'],
+          },
         ),
       ],
       account: const UserAccount(

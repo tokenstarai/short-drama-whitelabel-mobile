@@ -1,0 +1,12 @@
+{
+  "appName": "CoolShow Short",
+  "bundleId": "com.coolshow.short",
+  "tenantCode": "coolshow",
+  "primaryColor": "#FFB23F",
+  "logoAsset": "assets/visuals/coolshow-mark.png",
+  "supportedLocales": ["en-US", "zh-CN", "id-ID", "th-TH", "vi-VN", "ms-MY", "fil-PH"],
+  "customerServiceUrl": "https://short-drama-saas-admin-staging.pages.dev/support",
+  "termsUrl": "https://short-drama-saas-admin-staging.pages.dev/terms",
+  "privacyUrl": "https://short-drama-saas-admin-staging.pages.dev/privacy",
+  "apiAdapterBase": "https://short-drama-saas-tenant-edge-staging.tokenstarai.workers.dev"
+}

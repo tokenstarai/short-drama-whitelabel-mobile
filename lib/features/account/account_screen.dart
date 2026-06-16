@@ -39,18 +39,20 @@ class AccountScreen extends StatelessWidget {
     final account = runtime.account;
     final wallet = runtime.wallet;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 28),
       children: [
         CircleAvatar(
-          radius: 34,
+          radius: 24,
           backgroundColor: tokens.primary,
           child: const Icon(Icons.person, color: Colors.white),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Center(
           child: Text(
             runtime.appName,
-            style: Theme.of(context).textTheme.titleLarge,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
         Center(
@@ -59,17 +61,20 @@ class AccountScreen extends StatelessWidget {
             style: TextStyle(
               color: tokens.primary,
               fontWeight: FontWeight.w700,
+              fontSize: 12,
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Center(
           child: Text(
             '${account?.accountRefMasked ?? 'anon'} / ${account?.membershipTier ?? 'guest'} / ${wallet?.balanceCoins ?? 0} coins',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.black54),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         _AccountTile(
           icon: Icons.account_balance_wallet_outlined,
           label: strings.walletCenter,
@@ -84,6 +89,12 @@ class AccountScreen extends StatelessWidget {
             context,
           ).push(MaterialPageRoute(builder: (_) => AuthScreen(flavor: flavor))),
         ),
+        if ((account?.membershipTier ?? 'guest') != 'guest')
+          _AccountTile(
+            icon: Icons.logout_outlined,
+            label: strings.signOut,
+            onTap: runtime.signOut,
+          ),
         _AccountTile(
           icon: Icons.history,
           label: strings.watchHistory,
@@ -182,7 +193,11 @@ class AccountScreen extends StatelessWidget {
               ),
             ),
           ),
-        _AccountTile(icon: Icons.settings_outlined, label: strings.settings),
+        _AccountTile(
+          icon: Icons.settings_outlined,
+          label: strings.settings,
+          onTap: () => _showSettingsSheet(context, runtime, capabilities),
+        ),
       ],
     );
   }
@@ -253,6 +268,70 @@ Future<void> _showLanguagePicker(
   );
 }
 
+Future<void> _showSettingsSheet(
+  BuildContext context,
+  AppRuntime runtime,
+  AppCapabilities capabilities,
+) {
+  final strings = runtime.strings;
+  final parentContext = context;
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            Text(
+              strings.settings,
+              style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.translate_outlined),
+              title: Text(strings.language),
+              subtitle: Text(AppStrings.languageNameFor(runtime.localeCode)),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (parentContext.mounted) {
+                    _showLanguagePicker(parentContext, runtime);
+                  }
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.verified_user_outlined),
+              title: Text(
+                capabilities.storeComplianceMode.wireValue.replaceAll(
+                  '_',
+                  ' ',
+                ),
+              ),
+              subtitle: Text(
+                capabilities.externalPaymentsAllowed
+                    ? 'External payment entries are allowed by this build mode.'
+                    : 'External payment entries are hidden by this build mode.',
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.payment_outlined),
+              title: const Text('Payment providers'),
+              subtitle: Text(
+                runtime.effectivePaymentProviderWireValues.join(', '),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 class _AccountTile extends StatelessWidget {
   const _AccountTile({
     required this.icon,
@@ -270,11 +349,20 @@ class _AccountTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
+      margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        minLeadingWidth: 24,
         leading: Icon(icon),
-        title: Text(label),
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Text(label),
+        ),
         subtitle: value == null ? null : Text(value!),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: onTap == null ? null : const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
     );

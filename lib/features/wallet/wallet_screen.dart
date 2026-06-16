@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_runtime.dart';
 import '../../core/api/app_models.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../core/payment/store_purchase_service.dart';
 import '../../flavor/flavor.dart';
 import '../../theme/template_theme.dart';
@@ -68,8 +69,15 @@ class _WalletScreenBody extends StatefulWidget {
 class _WalletScreenBodyState extends State<_WalletScreenBody> {
   String? selectedPackageId;
   String? selectedChannelId;
+  final TextEditingController transferProofController = TextEditingController();
   bool requestedChannels = false;
   bool loadingChannels = false;
+
+  @override
+  void dispose() {
+    transferProofController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -115,6 +123,7 @@ class _WalletScreenBodyState extends State<_WalletScreenBody> {
           requestedCoins: package.totalCoins,
           endUserRef: runtime.endUserRef,
           paymentChannelId: channel.id,
+          proofR2Key: _transferProofReference(),
           idempotencyKey:
               'offline-$provider-${package.packageId}-${DateTime.now().millisecondsSinceEpoch}',
         );
@@ -129,6 +138,30 @@ class _WalletScreenBodyState extends State<_WalletScreenBody> {
         return;
       }
       if (isStorePurchaseProvider(provider)) {
+        if (runtime.isDemoMode) {
+          final verification = await runtime.client.verifyStorePurchase(
+            provider: provider,
+            packageId: package.packageId,
+            productId: package.storeProductId,
+            transactionId:
+                'demo-store-${DateTime.now().millisecondsSinceEpoch}',
+            purchaseToken: 'demo-purchase-token',
+            verificationData: 'demo-verification-data',
+            verificationSource: 'demo',
+            endUserRef: runtime.endUserRef,
+            idempotencyKey:
+                'demo-store-$provider-${package.packageId}-${DateTime.now().millisecondsSinceEpoch}',
+          );
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                'Order ${verification.orderId}: demo purchase verified · ${package.totalCoins} coins',
+              ),
+            ),
+          );
+          await runtime.refreshWallet();
+          return;
+        }
         final receipt = await widget.startStorePurchase(
           provider: provider,
           package: package,
@@ -192,7 +225,10 @@ class _WalletScreenBodyState extends State<_WalletScreenBody> {
       }
       await runtime.refreshWallet();
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text('$error')));
+      messenger.showSnackBar(
+        SnackBar(
+            content: Text(walletPaymentErrorMessage(runtime.strings, error))),
+      );
     }
   }
 
@@ -217,35 +253,98 @@ class _WalletScreenBodyState extends State<_WalletScreenBody> {
     final selectedChannel = _selectedChannel(paymentChannels);
     final usesChannels = payments.any(_usesChannel);
     return Scaffold(
-      appBar: AppBar(title: Text(strings.walletCenter)),
+      backgroundColor: tokens.background,
+      appBar: AppBar(
+        backgroundColor: tokens.background,
+        foregroundColor:
+            tokens.background.computeLuminance() < 0.25 ? Colors.white : null,
+        title: Text(strings.walletCenter),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: tokens.surface,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  tokens.primary,
+                  tokens.secondary,
+                  tokens.posterTint,
+                ],
+              ),
               borderRadius: BorderRadius.circular(tokens.radius),
-              border: Border.all(color: tokens.primary.withValues(alpha: 0.2)),
+              boxShadow: [
+                BoxShadow(
+                  color: tokens.primary.withValues(alpha: 0.22),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        tokens.name == 'Channel Theater'
+                            ? 'VIP member'
+                            : tokens.name == 'Cliffhanger Premium'
+                                ? 'Coins & VIP'
+                                : 'Wallet',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.diamond_outlined,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
                 Text(
                   strings.coins(wallet?.balanceCoins ?? 0),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
                         fontWeight: FontWeight.w900,
                       ),
                 ),
                 const SizedBox(height: 6),
-                Text(tokens.walletPitch),
-                const SizedBox(height: 12),
                 Text(
-                  'Ledger scope: ${wallet?.ledgerScope ?? 'consumer'} wallet',
+                  tokens.walletPitch,
                   style: TextStyle(
-                    color: tokens.primary,
+                    color: Colors.white.withValues(alpha: 0.78),
                     fontWeight: FontWeight.w700,
                   ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    const _WalletBenefit(label: 'HD 1080P'),
+                    const _WalletBenefit(label: 'Ad-free'),
+                    _WalletBenefit(
+                      label: '${wallet?.ledgerScope ?? 'consumer'} wallet',
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -275,6 +374,15 @@ class _WalletScreenBodyState extends State<_WalletScreenBody> {
                     selectedChannelId = channel.id;
                   }),
                 ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: transferProofController,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.receipt_long_outlined),
+                labelText: 'Transfer proof reference',
+                hintText: 'Receipt, transaction hash, or bank reference',
+              ),
+            ),
           ],
           const SizedBox(height: 16),
           Text(
@@ -308,6 +416,7 @@ class _WalletScreenBodyState extends State<_WalletScreenBody> {
           else
             for (final provider in payments)
               _WalletRow(
+                tileKey: ValueKey('payment-provider-$provider'),
                 icon: provider == 'point_card'
                     ? Icons.card_giftcard_outlined
                     : Icons.payments_outlined,
@@ -386,6 +495,15 @@ class _WalletScreenBodyState extends State<_WalletScreenBody> {
     }
     return channels.first;
   }
+
+  String? _transferProofReference() {
+    final value = transferProofController.text.trim();
+    return value.isEmpty ? null : value;
+  }
+}
+
+String walletPaymentErrorMessage(AppStrings strings, Object? _) {
+  return strings.paymentFailed;
 }
 
 bool _usesChannel(String provider) {
@@ -395,20 +513,63 @@ bool _usesChannel(String provider) {
 }
 
 class _WalletRow extends StatelessWidget {
-  const _WalletRow({required this.icon, required this.label, this.onTap});
+  const _WalletRow({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.tileKey,
+  });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final Key? tileKey;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(label),
-        trailing: onTap == null ? null : const Icon(Icons.chevron_right),
-        onTap: onTap,
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: colorScheme.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        child: ListTile(
+          key: tileKey,
+          leading: Icon(icon),
+          title: Text(label),
+          trailing: onTap == null ? null : const Icon(Icons.chevron_right),
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
+}
+
+class _WalletBenefit extends StatelessWidget {
+  const _WalletBenefit({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }

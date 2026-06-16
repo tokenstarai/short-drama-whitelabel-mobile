@@ -17,6 +17,27 @@ class PointCardFakeTransport implements AdapterTransport {
   }
 }
 
+class PointCardErrorTransport implements AdapterTransport {
+  final List<AdapterRequest> requests = [];
+
+  @override
+  Future<AdapterResponse> send(AdapterRequest request) async {
+    requests.add(request);
+    return const AdapterResponse(
+      statusCode: 409,
+      body: '''
+        {
+          "error": {
+            "code": "APP_INVALID_REQUEST",
+            "message": "Card code is invalid.",
+            "requestId": "req_card_raw"
+          }
+        }
+      ''',
+    );
+  }
+}
+
 void main() {
   testWidgets('mine screen opens point card management when card redeem is on',
       (
@@ -128,8 +149,7 @@ void main() {
   });
 
   testWidgets(
-      'card redeem blocks raw point_card payment options in app store builds',
-      (
+      'card redeem blocks raw point_card payment options in app store builds', (
     tester,
   ) async {
     final flavor = FlavorConfig.hongguo();
@@ -161,6 +181,43 @@ void main() {
     expect(find.text('Card redeem is not enabled.'), findsOneWidget);
     expect(find.text('Consumer point card'), findsNothing);
     expect(find.text('Redeem'), findsNothing);
+  });
+
+  testWidgets('card redeem maps Tenant Edge errors to friendly text', (
+    tester,
+  ) async {
+    final flavor = _pointCardFlavor();
+    final transport = PointCardErrorTransport();
+    final runtime = AppRuntime(
+      flavor: flavor,
+      localeCode: 'en-US',
+      endUserRef: 'anon:pulsedrama-card-error',
+      client: TenantAdapterClient(
+        baseUri: Uri.parse('https://tenant-edge.example.test'),
+        transport: transport,
+      ),
+    );
+    addTearDown(runtime.dispose);
+
+    await tester.pumpWidget(
+      AppRuntimeScope(
+        runtime: runtime,
+        child: MaterialApp(home: CardRedeemScreen(flavor: flavor)),
+      ),
+    );
+
+    await tester.enterText(find.widgetWithText(TextField, 'Card code'), 'BAD');
+    await tester.tap(find.text('Redeem'));
+    await tester.pumpAndSettle();
+
+    expect(transport.requests.single.path, '/payment/card-redeem');
+    expect(
+      find.text('This point card cannot be used. Please check it and retry.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('APP_INVALID_REQUEST'), findsNothing);
+    expect(find.textContaining('req_card_raw'), findsNothing);
+    expect(find.textContaining('Card code is invalid'), findsNothing);
   });
 }
 

@@ -14,10 +14,14 @@
   "playbackTokenFailed": "Ủy quyền phát không thành công. Vui lòng thử lại.",
   "cardRedeem": "Đổi thẻ",
   "onlinePayment": "Nạp tiền trực tuyến",
+  "paymentFailed": "Thanh toán thất bại. Vui lòng chọn cách khác hoặc thử lại.",
   "accountDelete": "Xóa tài khoản",
+  "authFailed": "Đăng nhập thất bại. Vui lòng thử lại hoặc chọn cách khác.",
   "settings": "Cài đặt",
   "language": "Ngôn ngữ",
   "pointCardManagement": "Quản lý thẻ điểm",
   "noPointCardRecords": "Chưa có lịch sử thẻ điểm",
+  "pointCardRedeemFailed": "Không thể dùng thẻ điểm này. Vui lòng kiểm tra và thử lại.",
+  "pointCardRedeemUnavailable": "Bản dựng này chưa hỗ trợ nạp bằng thẻ điểm.",
   "consumerWallet": "ví người dùng"
 }

@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:short_drama_whitelabel/app/short_drama_app.dart';
 import 'package:short_drama_whitelabel/core/api/tenant_adapter_client.dart';
+import 'package:short_drama_whitelabel/features/player/player_screen.dart';
 import 'package:short_drama_whitelabel/flavor/flavor.dart';
 
 class FakeAdapterTransport implements AdapterTransport {
@@ -20,6 +22,22 @@ class FakeAdapterTransport implements AdapterTransport {
     }
     return responses.removeAt(0);
   }
+}
+
+class TestAppDeepLinks implements AppDeepLinks {
+  TestAppDeepLinks({Uri? initialLink})
+      : _initialLink = Future.value(initialLink);
+
+  final Future<Uri?> _initialLink;
+  final controller = StreamController<Uri>.broadcast();
+
+  @override
+  Future<Uri?> getInitialLink() => _initialLink;
+
+  @override
+  Stream<Uri> get uriLinkStream => controller.stream;
+
+  Future<void> dispose() => controller.close();
 }
 
 AdapterResponse ok(Map<String, dynamic> body) {
@@ -91,7 +109,157 @@ Map<String, dynamic> configPayload() {
 }
 
 void main() {
-  testWidgets('remote config overrides template while native build caps payments',
+  testWidgets(
+      'share deep link opens its player episode without network request',
+      (tester) async {
+    final links = TestAppDeepLinks(
+      initialLink: Uri.parse(
+        'goldfruitdrama://dramas/drama_2/episodes/drama_2_ep_003',
+      ),
+    );
+    addTearDown(links.dispose);
+    final transport = FakeAdapterTransport([]);
+
+    await tester.pumpWidget(
+      ShortDramaApp(
+        flavor: FlavorConfig.hongguo(),
+        client: TenantAdapterClient(
+          baseUri: Uri.parse('https://tenant-edge.example.test'),
+          transport: transport,
+        ),
+        endUserRef: 'anon:goldfruit-share-deeplink-widget',
+        deepLinks: links,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Heiress Returns'), findsWidgets);
+    expect(find.textContaining('Episode 3'), findsWidgets);
+    expect(find.text('Unlock and Play'), findsOneWidget);
+    expect(transport.requests, isEmpty);
+  });
+
+  testWidgets('share deep link fetches public detail when catalog lacks drama',
+      (tester) async {
+    final links = TestAppDeepLinks(
+      initialLink: Uri.parse(
+        'goldfruitdrama://dramas/drama_remote_share/episodes/episode_remote_2',
+      ),
+    );
+    addTearDown(links.dispose);
+    final transport = FakeAdapterTransport([
+      ok({
+        'requestId': 'req_shared_detail',
+        'status': 'ok',
+        'drama': {
+          'dramaId': 'drama_remote_share',
+          'title': 'Shared Public Drama',
+          'posterUrl': '/posters/shared.png',
+          'episodeCount': 2,
+          'readyEpisodeCount': 2,
+          'pointPrice': 3,
+          'episodes': [
+            {
+              'episodeId': 'episode_remote_1',
+              'episodeNumber': 1,
+              'title': 'Shared Episode 1',
+              'pointPrice': 3,
+              'ready': true,
+              'locked': false,
+            },
+            {
+              'episodeId': 'episode_remote_2',
+              'episodeNumber': 2,
+              'title': 'Shared Episode 2',
+              'pointPrice': 3,
+              'ready': true,
+              'locked': true,
+            },
+          ],
+        },
+      }),
+    ]);
+
+    await tester.pumpWidget(
+      ShortDramaApp(
+        flavor: FlavorConfig.hongguo(),
+        client: TenantAdapterClient(
+          baseUri: Uri.parse('https://tenant-edge.example.test'),
+          transport: transport,
+        ),
+        endUserRef: 'anon:goldfruit-remote-share-widget',
+        deepLinks: links,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Shared Public Drama'), findsWidgets);
+    expect(find.textContaining('Shared Episode 2'), findsWidgets);
+    expect(find.text('Unlock and Play'), findsOneWidget);
+    expect(transport.requests.single.path, '/dramas/drama_remote_share');
+  });
+
+  testWidgets('share deep link ignores duplicate initial and stream uri',
+      (tester) async {
+    final uri = Uri.parse(
+      'goldfruitdrama://dramas/drama_duplicate_share/episodes/episode_duplicate_1',
+    );
+    final links = TestAppDeepLinks(initialLink: uri);
+    addTearDown(links.dispose);
+    final transport = FakeAdapterTransport([
+      ok({
+        'requestId': 'req_duplicate_detail',
+        'status': 'ok',
+        'drama': {
+          'dramaId': 'drama_duplicate_share',
+          'title': 'Duplicate Shared Drama',
+          'posterUrl': '/posters/duplicate.png',
+          'episodeCount': 1,
+          'readyEpisodeCount': 1,
+          'pointPrice': 2,
+          'episodes': [
+            {
+              'episodeId': 'episode_duplicate_1',
+              'episodeNumber': 1,
+              'title': 'Duplicate Episode 1',
+              'pointPrice': 2,
+              'ready': true,
+              'locked': false,
+            },
+          ],
+        },
+      }),
+    ]);
+
+    await tester.pumpWidget(
+      ShortDramaApp(
+        flavor: FlavorConfig.hongguo(),
+        client: TenantAdapterClient(
+          baseUri: Uri.parse('https://tenant-edge.example.test'),
+          transport: transport,
+        ),
+        endUserRef: 'anon:goldfruit-duplicate-share-widget',
+        deepLinks: links,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    links.controller.add(uri);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Duplicate Shared Drama'), findsWidgets);
+    expect(find.textContaining('Duplicate Episode 1'), findsWidgets);
+    expect(
+      find.byType(PlayerScreen, skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(transport.requests.single.path, '/dramas/drama_duplicate_share');
+  });
+
+  testWidgets(
+      'remote config overrides template while native build caps payments',
       (tester) async {
     final payload = configPayload();
     final config = payload['config'] as Map<String, dynamic>;
@@ -178,6 +346,11 @@ void main() {
     expect(find.text('Tenant Picked Drama'), findsOneWidget);
     expect(find.text('Every episode ends on a cliff'), findsOneWidget);
     expect(find.text('Cliffhanger Premium'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('app store'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('app store'), findsOneWidget);
     expect(find.text('payments gated'), findsOneWidget);
     expect(find.text('android direct'), findsNothing);
@@ -331,7 +504,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Seed Drama'), findsWidgets);
+    expect(find.text('Contract Wife'), findsWidgets);
     expect(
       find.text('Tenant Edge offline, showing local template data.'),
       findsOneWidget,

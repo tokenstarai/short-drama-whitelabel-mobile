@@ -13,7 +13,7 @@ if grep -R -n -E "(TENANT_APP_SECRET|CLOUDFLARE_API_TOKEN|client_secret|clientSe
   exit 1
 fi
 
-"$flutter_bin" pub get
+"$flutter_bin" --no-version-check pub get
 "$script_dir/check_app_config.mjs"
 python3 -m py_compile \
   "$script_dir/download_ios_ci_artifacts.py" \
@@ -27,9 +27,12 @@ python3 -m py_compile \
   "$script_dir/import_ios_ci_artifacts.py" \
   "$script_dir/import_github_publication_evidence.py" \
   "$script_dir/import_store_submission_evidence.py" \
+  "$script_dir/android_runtime_smoke_test.py" \
+  "$script_dir/ios_runtime_smoke.py" \
   "$script_dir/mobile_completion_closure.py" \
   "$script_dir/mobile_completion_audit.py" \
   "$script_dir/mobile_completion_audit_test.py" \
+  "$script_dir/prepare_store_submission_inputs.py" \
   "$script_dir/scan_release_artifacts.py" \
   "$script_dir/write_store_handoff_manifest.py"
 python3 "$script_dir/write_store_handoff_manifest.py"
@@ -43,10 +46,11 @@ python3 "$script_dir/export_completion_unblocker.py"
 python3 "$script_dir/export_open_source_template.py"
 python3 "$script_dir/export_github_publish_handoff.py"
 if [[ -f "$mobile_dir/../.github/workflows/mobile-flutter.yml" && -d "$mobile_dir/../apps/tenant-portal" ]]; then
+  python3 "$script_dir/android_runtime_smoke_test.py"
   python3 "$script_dir/mobile_completion_audit_test.py"
 else
   echo "Skipping monorepo completion audit tests in standalone template layout."
 fi
-"$flutter_bin" analyze
-"$flutter_bin" test
+"$flutter_bin" --no-version-check analyze
+"$flutter_bin" --no-version-check test
 "$script_dir/check_native_config.sh"

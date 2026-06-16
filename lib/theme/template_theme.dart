@@ -34,6 +34,22 @@ class TemplateTokens {
 
 TemplateTokens templateTokensFor(StyleTemplate template, Color brandPrimary) {
   return switch (template) {
+    StyleTemplate.coolshow => TemplateTokens(
+        name: 'CoolShow Short',
+        background: const Color(0xFF06070A),
+        surface: const Color(0xFF141820),
+        primary: brandPrimary,
+        secondary: const Color(0xFF2B79FF),
+        onMedia: Colors.white,
+        posterTint: const Color(0xFF8A3CFF),
+        radius: 18,
+        homeHeadline: 'Drama that starts fast',
+        dramaHook:
+            'Poster-led discovery, gold unlock CTAs, and overseas short-drama pacing.',
+        walletPitch:
+            'Coins, trial rewards, point cards, and tenant payment rails stay in the consumer wallet.',
+        playerModeLabel: 'CoolShow vertical episode',
+      ),
     StyleTemplate.hongguoInspired => TemplateTokens(
         name: 'Theater Grid',
         background: const Color(0xFFFFF8F5),

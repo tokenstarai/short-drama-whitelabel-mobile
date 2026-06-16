@@ -14,10 +14,14 @@
   "playbackTokenFailed": "播放授权失败，请重试。",
   "cardRedeem": "点卡兑换",
   "onlinePayment": "在线充值",
+  "paymentFailed": "支付失败，请更换方式或重试。",
   "accountDelete": "删除账号",
+  "authFailed": "登录失败，请重试或选择其他登录方式。",
   "settings": "设置",
   "language": "语言",
   "pointCardManagement": "点卡管理",
   "noPointCardRecords": "暂无点卡记录",
+  "pointCardRedeemFailed": "此点卡暂不可用，请检查后重试。",
+  "pointCardRedeemUnavailable": "当前构建不支持点卡充值。",
   "consumerWallet": "C端钱包"
 }

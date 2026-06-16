@@ -53,7 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flavor: [hongguo, douyin, hippo, reelshort]
+        flavor: [coolshow, hongguo, douyin, hippo, reelshort]
     defaults:
       run:
         working-directory: .
@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flavor: [hongguo, douyin, hippo, reelshort]
+        flavor: [coolshow, hongguo, douyin, hippo, reelshort]
     defaults:
       run:
         working-directory: .

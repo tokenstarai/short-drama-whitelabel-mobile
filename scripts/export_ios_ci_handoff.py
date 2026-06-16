@@ -19,6 +19,7 @@ DEFAULT_OUTPUT_DIR = ROOT / "build" / "ios-ci-handoff"
 PACKAGE_NAME = "mobile-ios-ci-handoff"
 
 FLAVOR_XCCONFIG = {
+    "coolshow": "Coolshow.xcconfig",
     "hongguo": "Hongguo.xcconfig",
     "douyin": "Douyin.xcconfig",
     "hippo": "Hippo.xcconfig",
@@ -98,7 +99,7 @@ def workflow_metadata(root: Path = ROOT) -> dict[str, Any]:
         "workflow_dispatch:",
         "ios-build:",
         "runs-on: macos-15",
-        "flavor: [hongguo, douyin, hippo, reelshort]",
+        "flavor: [coolshow, hongguo, douyin, hippo, reelshort]",
         "maxim-lobanov/setup-xcode@v1",
         "xcode-version: latest-stable",
         "./scripts/build_flavor.sh \"${{ matrix.flavor }}\" ios debug",

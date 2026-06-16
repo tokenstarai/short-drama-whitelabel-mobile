@@ -75,6 +75,11 @@ void main() {
               'termsUrl': '/terms',
               'privacyUrl': '/privacy',
             },
+            'catalogDisplay': {
+              'dimensionLabels': {'genre': '题材'},
+              'optionLabels': {'romance': '甜宠', 'mystery': '悬疑'},
+              'hiddenOptionIds': ['mystery'],
+            },
             'endpoints': {
               'config': '/config',
               'catalog': '/catalog',
@@ -84,8 +89,7 @@ void main() {
               'wallet': '/wallet',
               'paymentOptions': '/payment/options',
               'paymentIntent': '/payment/intents',
-              'paymentStorePurchaseVerify':
-                  '/payment/store-purchases/verify',
+              'paymentStorePurchaseVerify': '/payment/store-purchases/verify',
               'paymentCardRedeem': '/payment/card-redeem',
             },
           },
@@ -111,6 +115,9 @@ void main() {
         contains('point_card'),
       );
       expect(config.legal.privacyUrl, '/privacy');
+      expect(config.catalogDisplay.dimensionLabels['genre'], '题材');
+      expect(config.catalogDisplay.labelForOption('romance'), '甜宠');
+      expect(config.catalogDisplay.isOptionVisible('mystery'), isFalse);
       expect(
         jsonEncode(config.toPublicJson()).toLowerCase(),
         isNot(contains('secret')),
@@ -119,6 +126,50 @@ void main() {
       expectTenantEdgeOnly(transport.requests.single);
     },
   );
+
+  test('fetchCatalog keeps public discovery metadata for app filtering',
+      () async {
+    final transport = FakeAdapterTransport([
+      ok({
+        'requestId': 'req_catalog_meta',
+        'status': 'ok',
+        'items': [
+          {
+            'dramaId': 'drama_river',
+            'title': 'River Vow',
+            'summary': 'A cross-border romance.',
+            'posterUrl': '/posters/river.png',
+            'episodeCount': 24,
+            'readyEpisodeCount': 12,
+            'pointPrice': 2,
+            'language': 'id-ID',
+            'regions': ['ID', 'MY'],
+            'tags': ['Romance', 'Trending'],
+            'categorySelections': {
+              'genre': ['romance'],
+              'market': ['ID', 'MY'],
+            },
+          },
+        ],
+      }),
+    ]);
+    final client = TenantAdapterClient(
+      baseUri: Uri.parse('https://tenant-edge.example.test'),
+      transport: transport,
+    );
+
+    final catalog = await client.fetchCatalog();
+
+    expect(catalog.single.title, 'River Vow');
+    expect(catalog.single.summary, 'A cross-border romance.');
+    expect(catalog.single.language, 'id-ID');
+    expect(catalog.single.regions, ['ID', 'MY']);
+    expect(catalog.single.tags, ['Romance', 'Trending']);
+    expect(catalog.single.categorySelections['genre'], ['romance']);
+    expect(catalog.single.categorySelections['market'], ['ID', 'MY']);
+    expect(transport.requests.single.path, '/catalog');
+    expectTenantEdgeOnly(transport.requests.single);
+  });
 
   test('fetchWallet, ledger, and paymentOptions stay in consumer scope',
       () async {
@@ -195,7 +246,8 @@ void main() {
     expect(ledger.entries.single.balanceAfter, 120);
     expect(options.providers, ['stripe', 'paypal', 'point_card']);
     expect(options.packages.single.packageId, 'coins_300');
-    expect(options.packages.single.storeProductId, 'com.example.drama.coins300');
+    expect(
+        options.packages.single.storeProductId, 'com.example.drama.coins300');
     expect(options.packages.single.totalCoins, 330);
     expect(options.ledgerScope, 'consumer');
     expect(transport.requests.map((request) => request.path), [

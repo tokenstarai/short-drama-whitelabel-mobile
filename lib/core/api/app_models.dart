@@ -7,6 +7,36 @@ List<String> _stringList(Object? value) {
   return const [];
 }
 
+Map<String, String> _stringMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    final entries = value.entries.where(
+      (entry) =>
+          entry.value is String && (entry.value as String).trim().isNotEmpty,
+    );
+    return Map.unmodifiable(
+      Map.fromEntries(
+        entries.map(
+            (entry) => MapEntry(entry.key, (entry.value as String).trim())),
+      ),
+    );
+  }
+  return const {};
+}
+
+Map<String, List<String>> _stringListMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return Map.unmodifiable(
+      value.map(
+        (key, item) => MapEntry(
+          key,
+          List<String>.unmodifiable(_stringList(item)),
+        ),
+      ),
+    );
+  }
+  return const {};
+}
+
 int _intValue(Object? value, {int fallback = 0}) {
   if (value is int) {
     return value;
@@ -94,6 +124,43 @@ class AppLegalUrls {
   }
 }
 
+class CatalogDisplayConfig {
+  const CatalogDisplayConfig({
+    this.dimensionLabels = const {},
+    this.optionLabels = const {},
+    this.hiddenOptionIds = const [],
+  });
+
+  const CatalogDisplayConfig.empty() : this();
+
+  final Map<String, String> dimensionLabels;
+  final Map<String, String> optionLabels;
+  final List<String> hiddenOptionIds;
+
+  factory CatalogDisplayConfig.fromJson(Object? value) {
+    if (value is! Map<String, dynamic>) {
+      return const CatalogDisplayConfig.empty();
+    }
+    return CatalogDisplayConfig(
+      dimensionLabels: _stringMap(value['dimensionLabels']),
+      optionLabels: _stringMap(value['optionLabels']),
+      hiddenOptionIds: List.unmodifiable(_stringList(value['hiddenOptionIds'])),
+    );
+  }
+
+  String labelForOption(String optionId) => optionLabels[optionId] ?? optionId;
+
+  bool isOptionVisible(String optionId) => !hiddenOptionIds.contains(optionId);
+
+  Map<String, Object> toJson() {
+    return {
+      'dimensionLabels': dimensionLabels,
+      'optionLabels': optionLabels,
+      'hiddenOptionIds': hiddenOptionIds,
+    };
+  }
+}
+
 class AppConfig {
   const AppConfig({
     required this.requestId,
@@ -107,6 +174,7 @@ class AppConfig {
     required this.features,
     required this.capabilities,
     required this.legal,
+    this.catalogDisplay = const CatalogDisplayConfig.empty(),
   });
 
   final String requestId;
@@ -120,6 +188,7 @@ class AppConfig {
   final Map<String, bool> features;
   final AppCapabilities capabilities;
   final AppLegalUrls legal;
+  final CatalogDisplayConfig catalogDisplay;
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
     final config = json['config'] as Map<String, dynamic>;
@@ -128,6 +197,7 @@ class AppConfig {
     final app = config['app'] as Map<String, dynamic>? ?? const {};
     final theme = config['theme'] as Map<String, dynamic>? ?? const {};
     final legal = config['legal'] as Map<String, dynamic>? ?? const {};
+    final catalogDisplay = config['catalogDisplay'] ?? app['catalogDisplay'];
     final supportedLocales = List<String>.from(
       tenant['supportedLocales'] as List<dynamic>? ?? const ['en-US'],
     );
@@ -153,6 +223,7 @@ class AppConfig {
         ),
       ),
       legal: AppLegalUrls.fromJson(legal),
+      catalogDisplay: CatalogDisplayConfig.fromJson(catalogDisplay),
     );
   }
 
@@ -169,6 +240,7 @@ class AppConfig {
       'features': features,
       ...capabilities.toPublicJson(),
       'legal': legal.toJson(),
+      'catalogDisplay': catalogDisplay.toJson(),
     };
   }
 }
@@ -177,27 +249,44 @@ class CatalogDrama {
   const CatalogDrama({
     required this.dramaId,
     required this.title,
+    this.summary = '',
     required this.posterUrl,
     required this.episodeCount,
     required this.readyEpisodeCount,
     required this.pointPrice,
+    this.language = 'zh-CN',
+    this.regions = const [],
+    this.tags = const [],
+    this.categorySelections = const {},
   });
 
   final String dramaId;
   final String title;
+  final String summary;
   final String posterUrl;
   final int episodeCount;
   final int readyEpisodeCount;
   final int pointPrice;
+  final String language;
+  final List<String> regions;
+  final List<String> tags;
+  final Map<String, List<String>> categorySelections;
 
   factory CatalogDrama.fromJson(Map<String, dynamic> json) {
     return CatalogDrama(
       dramaId: json['dramaId'] as String,
       title: json['title'] as String,
+      summary: json['summary'] as String? ?? '',
       posterUrl: json['posterUrl'] as String,
       episodeCount: json['episodeCount'] as int,
       readyEpisodeCount: json['readyEpisodeCount'] as int,
       pointPrice: json['pointPrice'] as int,
+      language: json['language'] as String? ?? 'zh-CN',
+      regions: _stringList(json['regions']),
+      tags: _stringList(json['tags']),
+      categorySelections: _stringListMap(
+        json['categorySelections'] ?? json['categories'],
+      ),
     );
   }
 }

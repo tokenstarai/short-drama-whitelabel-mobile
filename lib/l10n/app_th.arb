@@ -14,10 +14,14 @@
   "playbackTokenFailed": "ขอสิทธิ์เล่นไม่สำเร็จ โปรดลองอีกครั้ง",
   "cardRedeem": "แลกบัตร",
   "onlinePayment": "เติมเงินออนไลน์",
+  "paymentFailed": "ชำระเงินไม่สำเร็จ โปรดเลือกวิธีอื่นหรือลองอีกครั้ง",
   "accountDelete": "ลบบัญชี",
+  "authFailed": "เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้งหรือเลือกวิธีอื่น",
   "settings": "ตั้งค่า",
   "language": "ภาษา",
   "pointCardManagement": "จัดการบัตรแต้ม",
   "noPointCardRecords": "ยังไม่มีประวัติบัตรแต้ม",
+  "pointCardRedeemFailed": "ไม่สามารถใช้บัตรแต้มนี้ได้ โปรดตรวจสอบแล้วลองอีกครั้ง",
+  "pointCardRedeemUnavailable": "บิลด์นี้ยังไม่รองรับการเติมเงินด้วยบัตรแต้ม",
   "consumerWallet": "กระเป๋าผู้ใช้"
 }

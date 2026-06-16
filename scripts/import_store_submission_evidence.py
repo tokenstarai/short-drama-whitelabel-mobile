@@ -5,21 +5,30 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_DIR = ROOT / "build" / "store-submission-evidence"
 DEFAULT_SOURCE = DEFAULT_EVIDENCE_DIR / "store-submission-evidence.input.json"
+DEFAULT_SOURCE_DIR = DEFAULT_EVIDENCE_DIR / "flavors"
 DEFAULT_OUTPUT = DEFAULT_EVIDENCE_DIR / "store-submission-evidence.json"
 DEFAULT_TEMPLATE = DEFAULT_EVIDENCE_DIR / "store-submission-evidence.template.json"
 DEFAULT_GUIDE = DEFAULT_EVIDENCE_DIR / "store-submission-evidence.guide.md"
 STORE_HANDOFF = ROOT / "build" / "release-handoff" / "mobile-store-handoff.json"
 
 FLAVOR_DEFAULTS = {
+    "coolshow": {
+        "applicationId": "com.coolshow.short",
+        "appName": "CoolShow Short",
+        "storeComplianceMode": "android_direct",
+        "primaryChannel": "android_direct",
+    },
     "hongguo": {
         "applicationId": "com.shortdrama.goldfruit",
         "appName": "GoldFruit Drama",
@@ -112,6 +121,40 @@ FORBIDDEN_MARKERS = [
     "-----begin private key-----",
 ]
 
+FORBIDDEN_EVIDENCE_REF_MARKERS = [
+    ".mobileprovision",
+    ".p12",
+    ".p8",
+    ".jks",
+    ".keystore",
+    "app-store-connect-api-key",
+    "authkey_",
+    "google-service-account",
+    "provisioning_profile",
+    "service_account",
+    "upload-keystore",
+]
+
+ALLOWED_EVIDENCE_REF_TYPES = {
+    "account_deletion_url",
+    "app_store_record",
+    "data_safety",
+    "direct_distribution_url",
+    "direct_package_checksum",
+    "legal_url",
+    "payment_policy",
+    "play_console_record",
+    "play_internal_track",
+    "privacy_url",
+    "review_state",
+    "store_product",
+    "support_url",
+    "testflight_build",
+}
+
+EVIDENCE_REF_PAYLOAD_FIELDS = ["value", "url", "sha256"]
+EVIDENCE_REF_OPTIONAL_FIELDS = EVIDENCE_REF_PAYLOAD_FIELDS + ["capturedAt"]
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -143,8 +186,38 @@ def marker_hits(value: Any) -> list[str]:
     return sorted({marker for marker in FORBIDDEN_MARKERS if marker in text})
 
 
+def evidence_ref_marker_hits(value: Any) -> list[str]:
+    if isinstance(value, str):
+        text = value.lower()
+    else:
+        text = json.dumps(value, ensure_ascii=False).lower()
+    return sorted(
+        marker for marker in FORBIDDEN_EVIDENCE_REF_MARKERS
+        if marker in text
+    )
+
+
 def required_flags(channel: str) -> list[str]:
     return BASE_REQUIRED_FLAGS + CHANNEL_REQUIRED_FLAGS.get(channel, [])
+
+
+def public_evidence_ref_schema() -> dict[str, Any]:
+    return {
+        "acceptedFormats": ["string", "object"],
+        "requiredObjectFields": "label, type, and one of value/url/sha256",
+        "urlRequirement": "When present, url must be a public HTTPS URL; localhost, file URLs, plain HTTP, loopback, private IP ranges, and .local hosts are rejected.",
+        "capturedAtRequirement": "evidenceCapturedAt and structured capturedAt values must be timezone-aware ISO-8601 timestamps that are not in the future.",
+        "allowedTypes": sorted(ALLOWED_EVIDENCE_REF_TYPES),
+        "objectFields": {
+            "label": "Required public human-readable evidence label.",
+            "type": "Required normalized public evidence type.",
+            "value": "Optional public build number, track name, product id, status, or checksum.",
+            "url": "Optional public HTTPS store, legal, support, or direct-distribution URL.",
+            "sha256": "Optional public checksum for signed direct-distribution artifacts.",
+            "capturedAt": "Optional timezone-aware ISO-8601 timestamp when this public evidence was captured; future timestamps are rejected.",
+        },
+        "secretBoundary": "Do not use credential filenames, signing files, provider credentials, service-account files, webhook secrets, bank credentials, crypto keys, or Cloudflare tokens as evidence refs.",
+    }
 
 
 def expected_entries() -> dict[str, dict[str, Any]]:
@@ -192,7 +265,7 @@ def template_submission(entry: dict[str, Any]) -> dict[str, Any]:
         **flags,
         "publicEvidenceRefs": [],
         "evidenceCapturedAt": None,
-        "notes": "Copy this template to store-submission-evidence.input.json and replace only public status fields. Do not paste signing files, provider credentials, API tokens, webhook secrets, service-account JSON, or private keys.",
+        "notes": "Copy this template to store-submission-evidence.input.json and replace only public status fields. Do not paste signing files, provider credentials, API tokens, webhook secrets, service-account JSON, private keys, or signing/credential file references such as .p12, .p8, .mobileprovision, .jks, or .keystore.",
     }
 
 
@@ -205,16 +278,89 @@ def write_template(template_path: Path, expected: dict[str, dict[str, Any]]) -> 
             "Fill one submission object per flavor after tenant-owned signing and store setup are complete.",
             "Use only public status references such as TestFlight build number, Play internal track name, or direct-distribution package checksum.",
             "Keep Apple signing assets, Google service-account files, OAuth credentials, payment provider keys, webhook secrets, bank credentials, and crypto keys outside this file and outside Git.",
+            "Do not use signing or credential file names as evidence references, including .p12, .p8, .mobileprovision, .jks, .keystore, AuthKey, upload-keystore, or service-account files.",
         ],
+        "publicEvidenceRefSchema": public_evidence_ref_schema(),
         "submissions": [
             template_submission(expected[flavor])
             for flavor in expected
         ],
-        "secretBoundary": "Public store-submission status metadata only; no signing material, provider credentials, OAuth secrets, payment secrets, webhook secrets, Cloudflare tokens, bank credentials, or crypto keys.",
+        "secretBoundary": "Public store-submission status metadata only; no signing material, provider credentials, OAuth secrets, payment secrets, webhook secrets, Cloudflare tokens, bank credentials, crypto keys, or signing/credential file references.",
     }
     template_path.parent.mkdir(parents=True, exist_ok=True)
     template_path.write_text(json.dumps(template, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return template_path
+
+
+def source_dir_for(source: Path) -> Path:
+    return source.parent / "flavors"
+
+
+def flavor_source_candidates(source_dir: Path, flavor: str) -> list[Path]:
+    return [
+        source_dir / f"{flavor}.input.json",
+        source_dir / f"{flavor}.json",
+        source_dir / flavor / "store-submission-evidence.input.json",
+    ]
+
+
+def submission_items(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, dict):
+        return []
+    submissions = raw.get("submissions")
+    if isinstance(submissions, list):
+        return [
+            item
+            for item in submissions
+            if isinstance(item, dict)
+        ]
+    if non_empty_string(raw.get("flavor")):
+        return [raw]
+    return []
+
+
+def merged_source_document(submissions: list[dict[str, Any]], input_records: list[dict[str, str]]) -> dict[str, Any]:
+    return {
+        "schemaVersion": 1,
+        "generatedAt": utc_now(),
+        "source": "tenant_store_submission_public_evidence_input",
+        "sourceMode": "per_flavor_merge",
+        "sourceInputPaths": input_records,
+        "submissions": submissions,
+        "secretBoundary": "Public store-submission status metadata only; no signing material, provider credentials, OAuth secrets, payment secrets, webhook secrets, Cloudflare tokens, bank credentials, crypto keys, or signing/credential file references.",
+    }
+
+
+def load_per_flavor_sources(
+    source_dir: Path,
+    expected: dict[str, dict[str, Any]],
+) -> tuple[dict[str, Any] | None, list[str], list[dict[str, str]]]:
+    submissions: list[dict[str, Any]] = []
+    errors: list[str] = []
+    input_records: list[dict[str, str]] = []
+    for flavor in expected:
+        for candidate in flavor_source_candidates(source_dir, flavor):
+            if not candidate.exists():
+                continue
+            try:
+                raw = json.loads(candidate.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as error:
+                errors.append(f"{flavor}:invalid-json:{error}")
+                break
+            items = submission_items(raw)
+            if not items:
+                errors.append(f"{flavor}:submission-missing")
+                break
+            submissions.extend(items)
+            input_records.append({
+                "flavor": flavor,
+                "path": rel(candidate),
+                "sha256": sha256_file(candidate),
+            })
+            break
+    if not submissions:
+        return None, errors, input_records
+    return merged_source_document(submissions, input_records), errors, input_records
 
 
 def evidence_examples(channel: str) -> list[str]:
@@ -243,13 +389,24 @@ def write_guide(guide_path: Path, expected: dict[str, dict[str, Any]]) -> Path:
         f"Generated at: `{utc_now()}`",
         "",
         "Use this guide after tenant-owned signing, store setup, OAuth callback registration, legal URL verification, and payment configuration are complete.",
-        "Copy `store-submission-evidence.template.json` to `store-submission-evidence.input.json`, replace only public status fields, then run:",
+        "Either copy `store-submission-evidence.template.json` to `store-submission-evidence.input.json` and replace all public status fields in one file, or save per-flavor files as `build/store-submission-evidence/flavors/<flavor>.input.json`.",
+        "For one combined evidence file, run:",
         "",
         "```bash",
         "./scripts/import_store_submission_evidence.py --strict",
         "```",
         "",
+        "For per-flavor evidence files, run:",
+        "",
+        "```bash",
+        "./scripts/import_store_submission_evidence.py --source-dir build/store-submission-evidence/flavors --strict",
+        "```",
+        "",
         "Keep signing files, OAuth credentials, payment credentials, webhook credentials, service-account files, bank credentials, and wallet keys outside Git and outside the evidence JSON.",
+        "Evidence refs must be public store or distribution metadata, not signing or credential filenames such as .p12, .p8, .mobileprovision, .jks, .keystore, AuthKey, upload-keystore, or service-account files.",
+        "Evidence refs may be plain public strings or structured objects with `label`, `type`, and at least one of `value`, `url`, or `sha256`; allowed object types are listed in `publicEvidenceRefSchema.allowedTypes`.",
+        "When a structured evidence ref includes `url`, it must be a public HTTPS URL; localhost, file URLs, plain HTTP, loopback, private IP ranges, and .local hosts are rejected.",
+        "`evidenceCapturedAt` and structured ref `capturedAt` values must be timezone-aware ISO-8601 timestamps that are not in the future.",
         "",
     ]
     for flavor, entry in expected.items():
@@ -285,6 +442,102 @@ def write_guide(guide_path: Path, expected: dict[str, dict[str, Any]]) -> Path:
 
 def non_empty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def is_public_https_url(value: str) -> bool:
+    try:
+        parsed = urlparse(value.strip())
+    except ValueError:
+        return False
+    if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+        return False
+    hostname = parsed.hostname
+    if not hostname:
+        return False
+    host = hostname.rstrip(".").lower()
+    if (
+        host == "localhost"
+        or host.endswith(".localhost")
+        or host.endswith(".local")
+        or "." not in host
+    ):
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    return address.is_global
+
+
+def parse_evidence_timestamp(value: Any) -> datetime | None:
+    if not non_empty_string(value):
+        return None
+    text = value.strip()
+    if "REPLACE_" in text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def is_valid_evidence_timestamp(value: Any, now: datetime | None = None) -> bool:
+    parsed = parse_evidence_timestamp(value)
+    if parsed is None:
+        return False
+    current_time = now or datetime.now(timezone.utc)
+    return parsed <= current_time
+
+
+def normalized_evidence_ref(item: Any) -> tuple[str | dict[str, str] | None, list[str]]:
+    if isinstance(item, str):
+        item_text = item.strip()
+        if not item_text or "REPLACE_" in item_text:
+            return None, ["publicEvidenceRefs"]
+        if evidence_ref_marker_hits(item_text):
+            return None, ["publicEvidenceRefsForbiddenMarkers"]
+        return item_text, []
+
+    if not isinstance(item, dict):
+        return None, ["publicEvidenceRefs"]
+
+    if evidence_ref_marker_hits(item):
+        return None, ["publicEvidenceRefsForbiddenMarkers"]
+
+    item_text = json.dumps(item, ensure_ascii=False)
+    if "REPLACE_" in item_text:
+        return None, ["publicEvidenceRefs"]
+
+    label = item.get("label")
+    evidence_type = item.get("type")
+    if not non_empty_string(label) or not non_empty_string(evidence_type):
+        return None, ["publicEvidenceRefs"]
+    evidence_type = evidence_type.strip()
+    if evidence_type not in ALLOWED_EVIDENCE_REF_TYPES:
+        return None, ["publicEvidenceRefs"]
+
+    normalized = {
+        "label": label.strip(),
+        "type": evidence_type,
+    }
+    for field in EVIDENCE_REF_OPTIONAL_FIELDS:
+        value = item.get(field)
+        if non_empty_string(value):
+            if field == "url" and not is_public_https_url(value):
+                return None, ["publicEvidenceRefsUrl"]
+            if field == "capturedAt" and not is_valid_evidence_timestamp(value):
+                return None, ["publicEvidenceRefsCapturedAt"]
+            normalized[field] = value.strip()
+
+    if not any(field in normalized for field in EVIDENCE_REF_PAYLOAD_FIELDS):
+        return None, ["publicEvidenceRefs"]
+
+    return normalized, []
 
 
 def validate_submission(
@@ -331,15 +584,19 @@ def validate_submission(
         reasons.append("publicEvidenceRefs")
         evidence_refs = []
     else:
-        cleaned_refs: list[str] = []
+        cleaned_refs: list[str | dict[str, str]] = []
         for item in evidence_refs:
-            if not non_empty_string(item) or "REPLACE_" in str(item):
-                reasons.append("publicEvidenceRefs")
+            normalized_ref, ref_reasons = normalized_evidence_ref(item)
+            if ref_reasons:
+                reasons.extend(ref_reasons)
                 continue
-            cleaned_refs.append(str(item))
+            if normalized_ref is not None:
+                cleaned_refs.append(normalized_ref)
         evidence_refs = cleaned_refs
+        if not evidence_refs:
+            reasons.append("publicEvidenceRefs")
 
-    if not non_empty_string(submission.get("evidenceCapturedAt")):
+    if not is_valid_evidence_timestamp(submission.get("evidenceCapturedAt")):
         reasons.append("evidenceCapturedAt")
 
     normalized = {
@@ -359,6 +616,66 @@ def validate_submission(
     if reasons:
         normalized["blockers"] = sorted(set(reasons))
     return normalized, reasons
+
+
+def remediation_hints(
+    flavor: str,
+    blockers: list[str],
+    expected: dict[str, dict[str, Any]],
+) -> list[str]:
+    expected_entry = expected.get(flavor)
+    target_path = f"build/store-submission-evidence/flavors/{flavor}.input.json"
+    starter_path = f"build/store-submission-starter/{flavor}/store-submission-evidence.input.example.json"
+    if not expected_entry:
+        return [f"Use one of the generated flavor ids: {', '.join(expected)}."]
+
+    channel = str(expected_entry["primaryChannel"])
+    allowed_statuses = ", ".join(ALLOWED_STATUSES_BY_CHANNEL[channel])
+    hints: list[str] = []
+    for blocker in blockers:
+        if blocker in {"input-evidence-missing", "missing-submission"}:
+            hints.append(
+                f"Copy {starter_path} to {target_path}, replace placeholders with tenant-owned public store status, then rerun source-dir strict import.",
+            )
+        elif blocker.startswith("invalid-json:"):
+            hints.append(f"Fix JSON syntax in the tenant evidence input, then rerun import. Parser detail: {blocker.removeprefix('invalid-json:')}")
+        elif blocker.endswith(":invalid-json") or ":invalid-json:" in blocker:
+            hints.append(f"Fix JSON syntax in {target_path} or the reported per-flavor input file, then rerun import.")
+        elif blocker.endswith(":submission-missing") or blocker == "submission-not-object":
+            hints.append(f"Ensure {target_path} contains either one submission object or a submissions array with one object for {flavor}.")
+        elif blocker == "submissionStatus":
+            hints.append(f"Set submissionStatus to one allowed {channel} value: {allowed_statuses}.")
+        elif blocker in required_flags(channel):
+            hints.append(f"Set {blocker}=true only after public tenant store or distribution evidence proves that checklist item.")
+        elif blocker == "publicEvidenceRefs":
+            hints.append("Add at least one public evidence ref such as TestFlight build number, Play internal track, signed package checksum, legal URL, support URL, or store product id.")
+        elif blocker == "publicEvidenceRefsUrl":
+            hints.append("Replace evidence ref URLs with public HTTPS URLs; localhost, file URLs, plain HTTP, loopback, private IP ranges, and .local hosts are rejected.")
+        elif blocker in {"evidenceCapturedAt", "publicEvidenceRefsCapturedAt"}:
+            hints.append("Use a timezone-aware ISO-8601 timestamp that is not in the future, for example 2026-06-14T00:00:00Z.")
+        elif blocker == "publicEvidenceRefsForbiddenMarkers":
+            hints.append("Remove signing or credential filenames from evidence refs; use public store or distribution metadata instead.")
+        elif blocker in {"applicationId", "appName"}:
+            hints.append(f"Fill the tenant-owned {blocker} value for this app flavor before importing evidence.")
+        elif blocker in {"storeComplianceMode", "primaryChannel", "templateApplicationId", "templateAppName"}:
+            hints.append(f"Keep {blocker} aligned with the generated handoff for {flavor}; regenerate the starter package if template metadata changed.")
+        elif blocker == "duplicate-flavor":
+            hints.append(f"Keep exactly one submission for {flavor} in the combined import source.")
+        else:
+            hints.append(f"Review and correct blocker `{blocker}` in {target_path}.")
+    return hints
+
+
+def blocked_flavor_entry(
+    flavor: str,
+    blockers: list[str],
+    expected: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "flavor": flavor,
+        "blockers": blockers,
+        "remediationHints": remediation_hints(flavor, blockers, expected),
+    }
 
 
 def blocked_report(
@@ -381,32 +698,67 @@ def blocked_report(
         "submissions": [],
         "missingFlavors": list(expected),
         "blockedFlavors": [
-            {"flavor": flavor, "blockers": [reason]}
+            blocked_flavor_entry(flavor, [reason], expected)
             for flavor in expected
         ],
         "forbiddenMarkerHits": [],
-        "secretBoundary": "Public tenant store-submission evidence only. Do not include signing material, provider credentials, OAuth secrets, payment secrets, webhook secrets, Cloudflare tokens, bank credentials, or crypto keys.",
+        "secretBoundary": "Public tenant store-submission evidence only. Do not include signing material, provider credentials, OAuth secrets, payment secrets, webhook secrets, Cloudflare tokens, bank credentials, crypto keys, or signing/credential file references.",
     }
 
 
-def import_evidence(source: Path, output: Path, template: Path, guide: Path | None = None) -> dict[str, Any]:
+def import_evidence(
+    source: Path,
+    output: Path,
+    template: Path,
+    guide: Path | None = None,
+    source_dir: Path | None = None,
+) -> dict[str, Any]:
     expected = expected_entries()
     guide_path = guide or template.with_name("store-submission-evidence.guide.md")
     write_template(template, expected)
     write_guide(guide_path, expected)
 
-    if not source.exists():
-        report = blocked_report(
-            source=source,
-            output=output,
-            template=template,
-            guide=guide_path,
-            expected=expected,
-            reason="input-evidence-missing",
+    source_mode = "combined"
+    source_input_records: list[dict[str, str]] = []
+    per_flavor_dir = source_dir or source_dir_for(source)
+    should_try_per_flavor = source_dir is not None or not source.exists()
+    if should_try_per_flavor:
+        per_flavor_raw, per_flavor_errors, per_flavor_input_records = load_per_flavor_sources(
+            per_flavor_dir,
+            expected,
         )
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        return report
+        if per_flavor_errors:
+            report = blocked_report(
+                source=source,
+                output=output,
+                template=template,
+                guide=guide_path,
+                expected=expected,
+                reason=per_flavor_errors[0],
+            )
+            report["result"] = "failed"
+            report["sourceMode"] = "per_flavor"
+            report["sourceInputPaths"] = per_flavor_input_records
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            return report
+        if per_flavor_raw is not None:
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(json.dumps(per_flavor_raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            source_mode = "per_flavor"
+            source_input_records = per_flavor_input_records
+        elif not source.exists():
+            report = blocked_report(
+                source=source,
+                output=output,
+                template=template,
+                guide=guide_path,
+                expected=expected,
+                reason="input-evidence-missing",
+            )
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            return report
 
     try:
         raw = json.loads(source.read_text(encoding="utf-8"))
@@ -434,7 +786,7 @@ def import_evidence(source: Path, output: Path, template: Path, guide: Path | No
     seen: set[str] = set()
     for item in submissions:
         if not isinstance(item, dict):
-            blocked_flavors.append({"flavor": "unknown", "blockers": ["submission-not-object"]})
+            blocked_flavors.append(blocked_flavor_entry("unknown", ["submission-not-object"], expected))
             continue
         normalized, reasons = validate_submission(item, expected)
         normalized_submissions.append(normalized)
@@ -443,22 +795,21 @@ def import_evidence(source: Path, output: Path, template: Path, guide: Path | No
             reasons.append("duplicate-flavor")
         seen.add(flavor)
         if reasons:
-            blocked_flavors.append({
-                "flavor": flavor,
-                "blockers": sorted(set(reasons)),
-            })
+            blocked_flavors.append(blocked_flavor_entry(flavor, sorted(set(reasons)), expected))
 
     missing = [flavor for flavor in expected if flavor not in seen]
     blocked_flavors.extend(
-        {"flavor": flavor, "blockers": ["missing-submission"]}
+        blocked_flavor_entry(flavor, ["missing-submission"], expected)
         for flavor in missing
     )
     report = {
         "schemaVersion": 1,
         "generatedAt": utc_now(),
         "result": "passed" if not missing and not blocked_flavors and not raw_marker_hits else "blocked",
+        "sourceMode": source_mode,
         "sourcePath": rel(source),
         "sourceSha256": sha256_file(source),
+        "sourceInputPaths": source_input_records,
         "templatePath": rel(template),
         "templateSha256": sha256_file(template),
         "guidePath": rel(guide_path),
@@ -468,7 +819,7 @@ def import_evidence(source: Path, output: Path, template: Path, guide: Path | No
         "missingFlavors": missing,
         "blockedFlavors": blocked_flavors,
         "forbiddenMarkerHits": raw_marker_hits,
-        "secretBoundary": "Public tenant store-submission evidence only. No signing material, provider credentials, OAuth secrets, payment secrets, webhook secrets, Cloudflare tokens, bank credentials, or crypto keys are stored in this report.",
+        "secretBoundary": "Public tenant store-submission evidence only. No signing material, provider credentials, OAuth secrets, payment secrets, webhook secrets, Cloudflare tokens, bank credentials, crypto keys, or signing/credential file references are stored in this report.",
     }
     if raw_marker_hits:
         report["result"] = "failed"
@@ -480,6 +831,7 @@ def import_evidence(source: Path, output: Path, template: Path, guide: Path | No
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
+    parser.add_argument("--source-dir", type=Path)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE)
     parser.add_argument("--guide", type=Path, default=DEFAULT_GUIDE)
@@ -491,6 +843,7 @@ def main() -> int:
         args.output.resolve(),
         args.template.resolve(),
         args.guide.resolve(),
+        args.source_dir.resolve() if args.source_dir else None,
     )
     print(f"Wrote store submission evidence template: {rel(args.template.resolve())}")
     print(f"Wrote store submission evidence guide: {rel(args.guide.resolve())}")

@@ -127,6 +127,24 @@ class AppStrings {
         ms: 'Tiada rekod kad mata lagi',
         fil: 'Wala pang point card records',
       );
+  String get pointCardRedeemFailed => _pick(
+        en: 'This point card cannot be used. Please check it and retry.',
+        zh: '此点卡暂不可用，请检查后重试。',
+        th: 'ไม่สามารถใช้บัตรแต้มนี้ได้ โปรดตรวจสอบแล้วลองอีกครั้ง',
+        id: 'Kartu poin ini tidak dapat digunakan. Periksa lalu coba lagi.',
+        vi: 'Không thể dùng thẻ điểm này. Vui lòng kiểm tra và thử lại.',
+        ms: 'Kad mata ini tidak boleh digunakan. Semak dan cuba lagi.',
+        fil: 'Hindi magamit ang point card na ito. Suriin ito at subukan muli.',
+      );
+  String get pointCardRedeemUnavailable => _pick(
+        en: 'Point card recharge is not available in this build.',
+        zh: '当前构建不支持点卡充值。',
+        th: 'บิลด์นี้ยังไม่รองรับการเติมเงินด้วยบัตรแต้ม',
+        id: 'Isi ulang kartu poin tidak tersedia di build ini.',
+        vi: 'Bản dựng này chưa hỗ trợ nạp bằng thẻ điểm.',
+        ms: 'Tambah nilai kad mata tidak tersedia dalam binaan ini.',
+        fil: 'Hindi available ang point card recharge sa build na ito.',
+      );
   String get consumerWallet => _pick(
         en: 'consumer wallet',
         zh: 'C端钱包',
@@ -145,6 +163,15 @@ class AppStrings {
         ms: 'Tambah Nilai Dalam Talian',
         fil: 'Online Top Up',
       );
+  String get paymentFailed => _pick(
+        en: 'Payment failed. Please choose another method or retry.',
+        zh: '支付失败，请更换方式或重试。',
+        th: 'ชำระเงินไม่สำเร็จ โปรดเลือกวิธีอื่นหรือลองอีกครั้ง',
+        id: 'Pembayaran gagal. Pilih metode lain atau coba lagi.',
+        vi: 'Thanh toán thất bại. Vui lòng chọn cách khác hoặc thử lại.',
+        ms: 'Pembayaran gagal. Pilih kaedah lain atau cuba lagi.',
+        fil: 'Nabigo ang pagbabayad. Pumili ng ibang paraan o subukan muli.',
+      );
   String get accountDelete => _pick(
         en: 'Delete Account',
         zh: '删除账号',
@@ -153,6 +180,15 @@ class AppStrings {
         vi: 'Xóa tài khoản',
         ms: 'Padam Akaun',
         fil: 'Burahin ang Account',
+      );
+  String get authFailed => _pick(
+        en: 'Sign-in failed. Please retry or choose another method.',
+        zh: '登录失败，请重试或选择其他登录方式。',
+        th: 'เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้งหรือเลือกวิธีอื่น',
+        id: 'Masuk gagal. Coba lagi atau pilih metode lain.',
+        vi: 'Đăng nhập thất bại. Vui lòng thử lại hoặc chọn cách khác.',
+        ms: 'Log masuk gagal. Cuba lagi atau pilih kaedah lain.',
+        fil: 'Nabigo ang pag-sign in. Subukan muli o pumili ng ibang paraan.',
       );
   String get settings => _pick(
         en: 'Settings',
@@ -196,6 +232,7 @@ class AppStrings {
         fil: 'Wallet Center',
       );
   String get loginRegister => _pick(en: 'Login / Register', zh: '登录/注册');
+  String get signOut => _pick(en: 'Sign Out', zh: '退出登录');
   String get watchHistory => _pick(en: 'Watch History', zh: '观看历史');
   String get favorites => _pick(en: 'Favorites', zh: '收藏');
   String get noWatchHistory =>
@@ -227,6 +264,12 @@ class AppStrings {
       );
   String get previousEpisode => _pick(en: 'Previous', zh: '上一集');
   String get nextEpisode => _pick(en: 'Next', zh: '下一集');
+  String get episodeList => _pick(en: 'Episode List', zh: '剧集列表');
+  String get shareDrama => _pick(en: 'Share Drama', zh: '分享短剧');
+  String get tenantSafeShareLink =>
+      _pick(en: 'Tenant-safe share link', zh: '租户安全分享链接');
+  String get copyLink => _pick(en: 'Copy Link', zh: '复制链接');
+  String get shareLinkCopied => _pick(en: 'Share link copied', zh: '分享链接已复制');
   String get paymentEntryGated =>
       _pick(en: 'Payment entry gated by store compliance', zh: '支付入口受商店合规限制');
   String get paymentsGated => _pick(en: 'payments gated', zh: '支付已受限');

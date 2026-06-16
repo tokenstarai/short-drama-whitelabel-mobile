@@ -71,6 +71,7 @@ require_ios_launcher_icons() {
 require_file "$mobile_dir/android/app/build.gradle.kts"
 require_file "$mobile_dir/android/app/src/main/AndroidManifest.xml"
 require_text "$mobile_dir/android/app/build.gradle.kts" 'flavorDimensions += "template"'
+require_text "$mobile_dir/android/app/build.gradle.kts" 'create("coolshow")'
 require_text "$mobile_dir/android/app/build.gradle.kts" 'create("hongguo")'
 require_text "$mobile_dir/android/app/build.gradle.kts" 'create("douyin")'
 require_text "$mobile_dir/android/app/build.gradle.kts" 'create("hippo")'
@@ -94,7 +95,7 @@ require_text "$mobile_dir/ios/Flutter/Release.xcconfig" "Pods-Runner.release.xcc
 require_file "$mobile_dir/ios/Flutter/Profile.xcconfig"
 require_text "$mobile_dir/ios/Flutter/Profile.xcconfig" "Pods-Runner.profile.xcconfig"
 require_text "$mobile_dir/ios/Runner.xcodeproj/project.pbxproj" "Profile.xcconfig"
-require_text "$mobile_dir/ios/Flutter/WhitelabelDefaults.xcconfig" '#include "Hongguo.xcconfig"'
+require_text "$mobile_dir/ios/Flutter/WhitelabelDefaults.xcconfig" '#include "Coolshow.xcconfig"'
 require_file "$mobile_dir/ios/Runner/Info.plist"
 require_file "$mobile_dir/ios/Runner/PrivacyInfo.xcprivacy"
 require_file "$mobile_dir/ios/Runner/Runner.entitlements"
@@ -141,6 +142,7 @@ validate_ios_flavor() {
   require_text "$scheme" 'buildConfiguration = "Release"'
 }
 
+validate_ios_flavor "coolshow" "Coolshow" "CoolShow Short" "com.coolshow.short" "coolshowshort" "QVBQX0ZMQVZPUj1jb29sc2hvdw=="
 validate_ios_flavor "hongguo" "Hongguo" "GoldFruit Drama" "com.shortdrama.goldfruit" "goldfruitdrama" "QVBQX0ZMQVZPUj1ob25nZ3Vv"
 validate_ios_flavor "douyin" "Douyin" "Pulse Drama" "com.shortdrama.pulse" "pulsedrama" "QVBQX0ZMQVZPUj1kb3V5aW4="
 validate_ios_flavor "hippo" "Hippo" "River Drama" "com.shortdrama.river" "riverdrama" "QVBQX0ZMQVZPUj1oaXBwbw=="
@@ -153,10 +155,12 @@ for file in \
   "$mobile_dir/ios/Runner/PrivacyInfo.xcprivacy" \
   "$mobile_dir/ios/Runner/Runner.entitlements" \
   "$mobile_dir/ios/Runner.xcodeproj/project.pbxproj" \
+  "$mobile_dir/ios/Flutter/Coolshow.xcconfig" \
   "$mobile_dir/ios/Flutter/Hongguo.xcconfig" \
   "$mobile_dir/ios/Flutter/Douyin.xcconfig" \
   "$mobile_dir/ios/Flutter/Hippo.xcconfig" \
   "$mobile_dir/ios/Flutter/Reelshort.xcconfig" \
+  "$mobile_dir/ios/Runner.xcodeproj/xcshareddata/xcschemes/coolshow.xcscheme" \
   "$mobile_dir/ios/Runner.xcodeproj/xcshareddata/xcschemes/hongguo.xcscheme" \
   "$mobile_dir/ios/Runner.xcodeproj/xcshareddata/xcschemes/douyin.xcscheme" \
   "$mobile_dir/ios/Runner.xcodeproj/xcshareddata/xcschemes/hippo.xcscheme" \

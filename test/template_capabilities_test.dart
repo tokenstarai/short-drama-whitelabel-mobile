@@ -86,8 +86,9 @@ void main() {
     expect(capabilities.externalPaymentsAllowed, isTrue);
   });
 
-  test('four MVP flavors map to four distinct style templates', () {
+  test('MVP flavors map to distinct style templates with CoolShow first', () {
     final templates = [
+      FlavorConfig.coolshow().capabilities.styleTemplate,
       FlavorConfig.hongguo().capabilities.styleTemplate,
       FlavorConfig.douyin().capabilities.styleTemplate,
       FlavorConfig.hippo().capabilities.styleTemplate,
@@ -95,6 +96,7 @@ void main() {
     ];
 
     expect(templates.toSet(), {
+      StyleTemplate.coolshow,
       StyleTemplate.hongguoInspired,
       StyleTemplate.douyinInspired,
       StyleTemplate.hippoInspired,
@@ -103,11 +105,12 @@ void main() {
   });
 
   test('publishable flavor config never exposes server secret fields', () {
-    final payload = FlavorConfig.reelshort().toPublicTemplateConfig();
+    final payload = FlavorConfig.coolshow().toPublicTemplateConfig();
     final serialized = payload.toString().toLowerCase();
 
-    expect(payload['styleTemplate'], 'reelshort_inspired');
-    expect(payload['storeComplianceMode'], 'play_store');
+    expect(payload['styleTemplate'], 'coolshow');
+    expect(payload['storeComplianceMode'], 'android_direct');
+    expect(payload['consumerPaymentProviders'], contains('point_card'));
     expect(serialized, isNot(contains('secret')));
     expect(serialized, isNot(contains('sk_')));
     expect(serialized, isNot(contains('tenant_app_secret')));

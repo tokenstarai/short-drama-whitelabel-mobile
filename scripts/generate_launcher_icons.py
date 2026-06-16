@@ -15,6 +15,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 FLAVORS = {
+    "coolshow": {
+        "start": (6, 7, 10),
+        "end": (31, 38, 54),
+        "accent": (255, 178, 63),
+        "accent2": (43, 121, 255),
+        "mark": "coolshow",
+    },
     "hongguo": {
         "start": (226, 58, 46),
         "end": (255, 138, 61),
@@ -200,6 +207,12 @@ def draw_mark(pixels: list[tuple[int, int, int]], size: int, flavor: str) -> Non
         draw_polygon(pixels, size, [(0.26, 0.18), (0.45, 0.18), (0.29, 0.82), (0.12, 0.82)], accent)
         draw_polygon(pixels, size, [(0.53, 0.18), (0.72, 0.18), (0.56, 0.82), (0.38, 0.82)], accent2)
         draw_polygon(pixels, size, [(0.43, 0.38), (0.43, 0.66), (0.67, 0.52)], white)
+    elif spec["mark"] == "coolshow":
+        draw_circle(pixels, size, 0.5, 0.5, 0.34, mix(accent2, white, 0.05))
+        draw_polygon(pixels, size, [(0.38, 0.27), (0.38, 0.73), (0.72, 0.50)], (138, 60, 255))
+        draw_polygon(pixels, size, [(0.30, 0.36), (0.30, 0.64), (0.52, 0.50)], accent)
+        draw_circle(pixels, size, 0.31, 0.28, 0.055, accent)
+        draw_circle(pixels, size, 0.68, 0.72, 0.046, accent2)
 
 
 def render_icon(flavor: str, size: int) -> list[tuple[int, int, int]]:
