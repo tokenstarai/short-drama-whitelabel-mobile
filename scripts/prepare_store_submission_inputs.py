@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -76,23 +75,73 @@ def ensure_starter(root: Path) -> None:
     export_store_submission_starter.export_starter(root, starter_root)
 
 
+def single_flavor_input(source: Path, flavor: str) -> dict[str, Any]:
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    submissions = raw.get("submissions")
+    if not isinstance(submissions, list) or len(submissions) != 1 or not isinstance(submissions[0], dict):
+        raise ValueError(f"{source} must contain exactly one submission object.")
+    submission = dict(submissions[0])
+    if submission.get("flavor") != flavor:
+        raise ValueError(f"{source} flavor does not match {flavor}.")
+    return {
+        "schemaVersion": raw.get("schemaVersion", 1),
+        "generatedAt": utc_now(),
+        "source": "tenant_store_submission_public_evidence_input_single_flavor",
+        "instructions": raw.get("instructions", []),
+        "publicEvidenceRefSchema": raw.get("publicEvidenceRefSchema", {}),
+        "secretBoundary": raw.get("secretBoundary", SECRET_BOUNDARY),
+        **submission,
+    }
+
+
+def generated_placeholder_input(path: Path, flavor: str) -> bool:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(raw.get("submissions"), list):
+        return False
+    items = import_store_submission_evidence.submission_items(raw)
+    if len(items) != 1:
+        return False
+    item = items[0]
+    return (
+        item.get("flavor") == flavor
+        and item.get("tenantMustReplacePlaceholders") is True
+        and item.get("submissionStatus") == "pending_tenant_action"
+        and item.get("publicEvidenceRefs") == []
+        and not item.get("evidenceCapturedAt")
+    )
+
+
+def write_single_input(source: Path, target: Path, flavor: str) -> None:
+    target.write_text(
+        json.dumps(single_flavor_input(source, flavor), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
 def copy_input(root: Path, output_dir: Path, flavor: str, *, force: bool) -> dict[str, Any]:
     source = starter_input_path(root, flavor)
     target = target_input_path(output_dir, flavor)
     target.parent.mkdir(parents=True, exist_ok=True)
     status = "exists"
     if not target.exists():
-        shutil.copyfile(source, target)
+        write_single_input(source, target, flavor)
         status = "created"
     elif force:
-        shutil.copyfile(source, target)
+        write_single_input(source, target, flavor)
         status = "overwritten"
+    elif generated_placeholder_input(target, flavor):
+        write_single_input(source, target, flavor)
+        status = "migrated"
     return {
         "flavor": flavor,
         "status": status,
         "sourcePath": rel(root, source),
         "targetPath": rel(root, target),
         "sha256": sha256_file(target),
+        "inputShape": "single_flavor_submission",
         "tenantMustReplacePlaceholders": True,
     }
 
@@ -173,15 +222,16 @@ def markdown_from_manifest(manifest: dict[str, Any]) -> str:
         f"- Strict import ready: `{preflight.get('strictImportReady', False)}`",
         f"- Preflight report: `{preflight.get('preflightReportPath', '')}`",
         "",
-        "This workspace copies no-secret starter examples into per-flavor input files. It does not overwrite existing tenant-filled inputs unless `--force` is used.",
+        "This workspace converts no-secret starter examples into single-flavor input files. It does not overwrite existing tenant-filled inputs unless `--force` is used.",
+        "Generated placeholder files may be migrated from the older `submissions[0]` wrapper into the flatter single-flavor shape.",
         "",
-        "| Flavor | Status | Input path | Preflight | Blockers |",
-        "| --- | --- | --- | --- | --- |",
+        "| Flavor | Status | Shape | Input path | Preflight | Blockers |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for row in manifest["inputs"]:
         blockers = ", ".join(row.get("preflightBlockers", [])) or "-"
         lines.append(
-            f"| {row['flavor']} | {row['status']} | `{row['targetPath']}` | {row.get('preflightStatus', 'blocked')} | {blockers} |",
+            f"| {row['flavor']} | {row['status']} | {row.get('inputShape', 'single_flavor_submission')} | `{row['targetPath']}` | {row.get('preflightStatus', 'blocked')} | {blockers} |",
         )
     lines.extend([
         "",

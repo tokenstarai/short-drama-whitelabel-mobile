@@ -3189,6 +3189,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertEqual("store_submission_input_workspace", manifest["packageType"])
         self.assertEqual("created", manifest["inputs"][0]["status"])
         self.assertEqual("exists", second_manifest["inputs"][0]["status"])
+        self.assertEqual("single_flavor_submission", manifest["inputs"][0]["inputShape"])
         self.assertFalse(manifest["inputs"][0]["readyForStrictImport"])
         self.assertIn("submissionStatus", manifest["inputs"][0]["preflightBlockers"])
         self.assertEqual(len(import_store_submission_evidence.FLAVOR_DEFAULTS), len(manifest["inputs"]))
@@ -3197,8 +3198,10 @@ class MobileCompletionAuditTest(unittest.TestCase):
             manifest["inputs"][0]["targetPath"],
         )
         self.assertEqual(["pending_tenant_action"], manifest["blockingPlaceholders"])
-        self.assertTrue(hongguo["submissions"][0]["tenantMustReplacePlaceholders"])
-        self.assertEqual("pending_tenant_action", hongguo["submissions"][0]["submissionStatus"])
+        self.assertEqual("tenant_store_submission_public_evidence_input_single_flavor", hongguo["source"])
+        self.assertEqual("hongguo", hongguo["flavor"])
+        self.assertTrue(hongguo["tenantMustReplacePlaceholders"])
+        self.assertEqual("pending_tenant_action", hongguo["submissionStatus"])
         next_commands = "\n".join(manifest["nextCommands"])
         self.assertIn("scripts/store_submission_evidence_preflight.py", next_commands)
         self.assertIn("scripts/import_store_submission_evidence.py --source-dir build/store-submission-evidence/flavors --strict", next_commands)
@@ -3206,6 +3209,7 @@ class MobileCompletionAuditTest(unittest.TestCase):
         self.assertIn("Preflight result: `blocked`", markdown)
         self.assertIn("submissionStatus", markdown)
         self.assertIn("Preflight result: `blocked`", preflight_markdown)
+        self.assertIn("single-flavor input files", markdown)
         self.assertIn("does not overwrite existing tenant-filled inputs", markdown)
         lowered = (
             json.dumps(manifest, ensure_ascii=False).lower()
